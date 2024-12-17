@@ -49,6 +49,68 @@ export default function PolygonPage() {
       return inside;
     }
 
+    // 점과 선분 사이의 거리를 계산하는 함수
+    function distanceToLineSegment(
+      point: PIXI.Point,
+      start: PIXI.Point,
+      end: PIXI.Point
+    ): number {
+      const A = point.x - start.x;
+      const B = point.y - start.y;
+      const C = end.x - start.x;
+      const D = end.y - start.y;
+
+      const dot = A * C + B * D;
+      const len_sq = C * C + D * D;
+      let param = -1;
+
+      if (len_sq !== 0) {
+        param = dot / len_sq;
+      }
+
+      let xx, yy;
+
+      if (param < 0) {
+        xx = start.x;
+        yy = start.y;
+      } else if (param > 1) {
+        xx = end.x;
+        yy = end.y;
+      } else {
+        xx = start.x + param * C;
+        yy = start.y + param * D;
+      }
+
+      const dx = point.x - xx;
+      const dy = point.y - yy;
+
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    // 폴리곤의 가장 가까운 선분을 찾는 함수
+    function findNearestEdge(point: PIXI.Point): [number, number] {
+      const threshold = 10;
+      let minDistance = Infinity;
+      let nearestPolygon = -1;
+      let nearestEdge = -1;
+
+      polygons.forEach((polygon, polygonIndex) => {
+        for (let i = 0; i < polygon.length; i++) {
+          const start = polygon[i];
+          const end = polygon[(i + 1) % polygon.length];
+          const distance = distanceToLineSegment(point, start, end);
+
+          if (distance < threshold && distance < minDistance) {
+            minDistance = distance;
+            nearestPolygon = polygonIndex;
+            nearestEdge = i;
+          }
+        }
+      });
+
+      return [nearestPolygon, nearestEdge];
+    }
+
     function findPolygonByPoint(point: PIXI.Point): number {
       for (let i = polygons.length - 1; i >= 0; i--) {
         if (isPointInPolygon(point, polygons[i])) {
@@ -75,6 +137,22 @@ export default function PolygonPage() {
           if (polygonIndex !== -1 && pointIndex !== -1) {
             selectedPolygonIndex = polygonIndex;
             selectedPointIndex = pointIndex;
+            isDragging = true;
+            return;
+          }
+
+          // 선분 위의 점 확인
+          const [edgePolygonIndex, edgeIndex] = findNearestEdge(point);
+          if (edgePolygonIndex !== -1 && edgeIndex !== -1) {
+            // 선분에 새로운 점 추가
+            const polygon = polygons[edgePolygonIndex];
+            const newPoints = [...polygon];
+            newPoints.splice(edgeIndex + 1, 0, point);
+            polygons[edgePolygonIndex] = newPoints;
+
+            // 새로 추가된 점을 선택 상태로
+            selectedPolygonIndex = edgePolygonIndex;
+            selectedPointIndex = edgeIndex + 1;
             isDragging = true;
             return;
           }
@@ -133,6 +211,20 @@ export default function PolygonPage() {
         }
         drawAll();
         return;
+      }
+
+      // 마우스가 선분 위에 있을 때 시각적 피드백
+      if (!isDrawing && !isDragging) {
+        const [edgePolygonIndex, edgeIndex] = findNearestEdge(point);
+        drawAll();
+        if (edgePolygonIndex !== -1 && edgeIndex !== -1) {
+          const polygon = polygons[edgePolygonIndex];
+          const start = polygon[edgeIndex];
+          const end = polygon[(edgeIndex + 1) % polygon.length];
+          graphics.lineStyle(3, 0xff0000);
+          graphics.moveTo(start.x, start.y);
+          graphics.lineTo(end.x, end.y);
+        }
       }
 
       if (isDrawing && currentPoints.length >= 3) {
