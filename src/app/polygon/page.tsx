@@ -22,18 +22,45 @@ export default function PolygonPage() {
     let selectedPointIndex = -1;
     let isDrawing = false;
     let isDragging = false;
+    let dragStartPos: PIXI.Point | null = null;
 
-    // 마우스 이벤트 리스너 추가
     app.view.addEventListener('mousedown', onMouseDown);
     app.view.addEventListener('mousemove', onMouseMove);
     app.view.addEventListener('mouseup', onMouseUp);
     app.view.addEventListener('contextmenu', (e) => e.preventDefault());
     document.addEventListener('keydown', onKeyDown);
 
+    function isPointInPolygon(
+      point: PIXI.Point,
+      polygon: PIXI.Point[]
+    ): boolean {
+      let inside = false;
+      for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const xi = polygon[i].x,
+          yi = polygon[i].y;
+        const xj = polygon[j].x,
+          yj = polygon[j].y;
+
+        const intersect =
+          yi > point.y !== yj > point.y &&
+          point.x < ((xj - xi) * (point.y - yi)) / (yj - yi) + xi;
+        if (intersect) inside = !inside;
+      }
+      return inside;
+    }
+
+    function findPolygonByPoint(point: PIXI.Point): number {
+      for (let i = polygons.length - 1; i >= 0; i--) {
+        if (isPointInPolygon(point, polygons[i])) {
+          return i;
+        }
+      }
+      return -1;
+    }
+
     function onMouseDown(e: MouseEvent) {
       const point = new PIXI.Point(e.offsetX, e.offsetY);
 
-      // 우클릭: 그리기 취소
       if (e.button === 2) {
         currentPoints = [];
         isDrawing = false;
@@ -41,10 +68,9 @@ export default function PolygonPage() {
         return;
       }
 
-      // 좌클릭
       if (e.button === 0) {
-        // 점 선택 모드
         if (!isDrawing) {
+          // 먼저 점 선택 확인
           const [polygonIndex, pointIndex] = findNearestPoint(point);
           if (polygonIndex !== -1 && pointIndex !== -1) {
             selectedPolygonIndex = polygonIndex;
@@ -52,12 +78,20 @@ export default function PolygonPage() {
             isDragging = true;
             return;
           }
+
+          // 폴리곤 내부 선택 확인
+          const selectedPolygon = findPolygonByPoint(point);
+          if (selectedPolygon !== -1) {
+            selectedPolygonIndex = selectedPolygon;
+            selectedPointIndex = -1;
+            isDragging = true;
+            dragStartPos = new PIXI.Point(e.offsetX, e.offsetY);
+            return;
+          }
         }
 
-        // 그리기 모드
         isDrawing = true;
 
-        // 첫 점과 가까운지 체크 (폴리곤 완성 조건)
         if (currentPoints.length >= 3) {
           const firstPoint = currentPoints[0];
           const dx = firstPoint.x - point.x;
@@ -65,9 +99,8 @@ export default function PolygonPage() {
           const distance = Math.sqrt(dx * dx + dy * dy);
 
           if (distance < 20) {
-            // 20픽셀 이내로 가까워지면
-            polygons.push([...currentPoints]); // 현재 폴리곤 완성
-            currentPoints = []; // 새로운 폴리곤 시작
+            polygons.push([...currentPoints]);
+            currentPoints = [];
             isDrawing = false;
             drawAll();
             return;
@@ -82,19 +115,26 @@ export default function PolygonPage() {
     function onMouseMove(e: MouseEvent) {
       const point = new PIXI.Point(e.offsetX, e.offsetY);
 
-      // 점 드래그
-      if (
-        isDragging &&
-        selectedPolygonIndex !== -1 &&
-        selectedPointIndex !== -1
-      ) {
-        polygons[selectedPolygonIndex][selectedPointIndex].x = point.x;
-        polygons[selectedPolygonIndex][selectedPointIndex].y = point.y;
+      if (isDragging && selectedPolygonIndex !== -1) {
+        if (selectedPointIndex !== -1) {
+          // 단일 점 이동
+          polygons[selectedPolygonIndex][selectedPointIndex].x = point.x;
+          polygons[selectedPolygonIndex][selectedPointIndex].y = point.y;
+        } else if (dragStartPos) {
+          // 전체 폴리곤 이동
+          const dx = point.x - dragStartPos.x;
+          const dy = point.y - dragStartPos.y;
+
+          polygons[selectedPolygonIndex] = polygons[selectedPolygonIndex].map(
+            (p) => new PIXI.Point(p.x + dx, p.y + dy)
+          );
+
+          dragStartPos = point;
+        }
         drawAll();
         return;
       }
 
-      // 그리기 중일 때 첫 점과의 거리 표시
       if (isDrawing && currentPoints.length >= 3) {
         const firstPoint = currentPoints[0];
         const dx = firstPoint.x - point.x;
@@ -103,7 +143,6 @@ export default function PolygonPage() {
 
         drawAll();
 
-        // 첫 점과 현재 마우스 위치가 가까우면 연결선 표시
         if (distance < 20) {
           graphics.lineStyle(2, 0x00ff00);
           graphics.moveTo(
@@ -117,18 +156,16 @@ export default function PolygonPage() {
 
     function onMouseUp() {
       isDragging = false;
+      dragStartPos = null;
     }
 
     function onKeyDown(e: KeyboardEvent) {
-      // Delete 키: 선택된 폴리곤 삭제
       if (e.key === 'Delete' && selectedPolygonIndex !== -1) {
         polygons.splice(selectedPolygonIndex, 1);
         selectedPolygonIndex = -1;
         selectedPointIndex = -1;
         drawAll();
-      }
-      // Escape 키: 현재 그리기 취소
-      else if (e.key === 'Escape') {
+      } else if (e.key === 'Escape') {
         currentPoints = [];
         isDrawing = false;
         drawAll();
@@ -153,7 +190,6 @@ export default function PolygonPage() {
     function drawAll() {
       graphics.clear();
 
-      // 완성된 폴리곤들 그리기
       polygons.forEach((polygon, index) => {
         graphics.lineStyle(2, 0x000000);
         graphics.beginFill(
@@ -168,7 +204,6 @@ export default function PolygonPage() {
         graphics.lineTo(polygon[0].x, polygon[0].y);
         graphics.endFill();
 
-        // 각 점 그리기
         polygon.forEach((point, pointIndex) => {
           const isSelected =
             index === selectedPolygonIndex && pointIndex === selectedPointIndex;
@@ -178,7 +213,6 @@ export default function PolygonPage() {
         });
       });
 
-      // 현재 그리고 있는 폴리곤 그리기
       if (currentPoints.length > 0) {
         graphics.lineStyle(2, 0x000000);
         graphics.moveTo(currentPoints[0].x, currentPoints[0].y);
@@ -187,7 +221,6 @@ export default function PolygonPage() {
           graphics.lineTo(currentPoints[i].x, currentPoints[i].y);
         }
 
-        // 각 점 그리기
         currentPoints.forEach((point, index) => {
           const isFirstPoint = index === 0 && currentPoints.length >= 3;
           graphics.beginFill(isFirstPoint ? 0x00ff00 : 0x000000);
