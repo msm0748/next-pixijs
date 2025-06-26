@@ -21,7 +21,7 @@ const App = observer(() => {
   useEffect(() => {
     const loadTexture = async () => {
       try {
-        const loadedTexture = await Assets.load('/globe.svg');
+        const loadedTexture = await Assets.load('/test.jpg');
         setTexture(loadedTexture);
       } catch (error) {
         console.error('텍스처 로드 실패:', error);
@@ -30,67 +30,78 @@ const App = observer(() => {
     loadTexture();
   }, []);
 
+  // 휠 이벤트 핸들러
+  const handleWheel = (e: WheelEvent) => {
+    e.preventDefault(); // 기본 스크롤 동작 방지
+    console.log(
+      '휠 이벤트 발생:',
+      e.deltaY,
+      'Cmd:',
+      e.metaKey,
+      'Ctrl:',
+      e.ctrlKey
+    ); // 디버깅용
+
+    const currentScale = canvasStore.scale.get();
+    const currentPosition = canvasStore.position.get();
+
+    // Cmd(Mac) 또는 Ctrl(Windows/Linux) 키가 눌렸을 때만 확대/축소
+    if (e.metaKey || e.ctrlKey) {
+      console.log('확대/축소 모드'); // 디버깅용
+      const scaleFactor = 1.1;
+      const calculatedScale =
+        e.deltaY < 0 ? currentScale * scaleFactor : currentScale / scaleFactor;
+
+      // 스케일 범위 제한을 먼저 적용
+      const newScale = Math.max(0.1, Math.min(5, calculatedScale));
+
+      // 실제로 변경될 스케일이 현재와 같다면 위치 계산하지 않음
+      if (newScale === currentScale) {
+        return;
+      }
+
+      // 마우스 위치를 중심으로 확대/축소
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      const newPosition = {
+        x: mouseX - (mouseX - currentPosition.x) * (newScale / currentScale),
+        y: mouseY - (mouseY - currentPosition.y) * (newScale / currentScale),
+      };
+
+      canvasActions.setScale(newScale);
+      canvasActions.setPosition(newPosition);
+    } else {
+      console.log('이동 모드'); // 디버깅용
+      // 일반 휠: 이미지를 위/아래/좌/우로 이동
+      const scrollSpeed = 50; // 스크롤 속도 조절
+      const newPosition = {
+        x:
+          currentPosition.x -
+          (e.deltaX > 0 ? scrollSpeed : e.deltaX < 0 ? -scrollSpeed : 0), // 좌우 이동
+        y:
+          currentPosition.y -
+          (e.deltaY > 0 ? scrollSpeed : e.deltaY < 0 ? -scrollSpeed : 0), // 위아래 이동
+      };
+      canvasActions.setPosition(newPosition);
+    }
+  };
+
   // 휠 이벤트 리스너 등록 (passive: false로 설정)
   useEffect(() => {
-    const handleWheel = (e: WheelEvent) => {
-      e.preventDefault(); // 기본 스크롤 동작 방지
-
-      const currentScale = canvasStore.scale.get();
-      const currentPosition = canvasStore.position.get();
-
-      // Cmd(Mac) 또는 Ctrl(Windows/Linux) 키가 눌렸을 때만 확대/축소
-      if (e.metaKey || e.ctrlKey) {
-        const scaleFactor = 1.1;
-        const calculatedScale =
-          e.deltaY < 0
-            ? currentScale * scaleFactor
-            : currentScale / scaleFactor;
-
-        // 스케일 범위 제한을 먼저 적용
-        const newScale = Math.max(0.1, Math.min(5, calculatedScale));
-
-        // 실제로 변경될 스케일이 현재와 같다면 위치 계산하지 않음
-        if (newScale === currentScale) {
-          return;
-        }
-
-        // 마우스 위치를 중심으로 확대/축소
-        const rect = containerRef.current?.getBoundingClientRect();
-        if (!rect) return;
-
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-
-        const newPosition = {
-          x: mouseX - (mouseX - currentPosition.x) * (newScale / currentScale),
-          y: mouseY - (mouseY - currentPosition.y) * (newScale / currentScale),
-        };
-
-        canvasActions.setScale(newScale);
-        canvasActions.setPosition(newPosition);
-      } else {
-        // 일반 휠: 이미지를 위/아래/좌/우로 이동
-        const scrollSpeed = 50; // 스크롤 속도 조절
-        const newPosition = {
-          x:
-            currentPosition.x -
-            (e.deltaX > 0 ? scrollSpeed : e.deltaX < 0 ? -scrollSpeed : 0), // 좌우 이동
-          y:
-            currentPosition.y -
-            (e.deltaY > 0 ? scrollSpeed : e.deltaY < 0 ? -scrollSpeed : 0), // 위아래 이동
-        };
-        canvasActions.setPosition(newPosition);
-      }
-    };
-
     const container = containerRef.current;
     if (container) {
+      console.log('휠 이벤트 리스너 등록됨'); // 디버깅용
       container.addEventListener('wheel', handleWheel, { passive: false });
       return () => {
+        console.log('휠 이벤트 리스너 제거됨'); // 디버깅용
         container.removeEventListener('wheel', handleWheel);
       };
     }
-  }, []);
+  }, [texture]); // texture가 로드된 후에 이벤트 등록
 
   // 월드 좌표로 변환하는 함수
   const screenToWorld = (screenX: number, screenY: number) => {
