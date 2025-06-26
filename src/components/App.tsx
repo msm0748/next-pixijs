@@ -6,6 +6,8 @@ import { useState, useRef, PointerEvent, useEffect } from 'react';
 import { observer } from '@legendapp/state/react';
 import { canvasStore, canvasActions, Rectangle } from '../store/canvasStore';
 import { RectangleRenderer } from './RectangleRenderer';
+import { SelectionHandles, getHandleAtPosition } from './SelectionHandles';
+import { findRectAtPosition } from '../utils/rectUtils';
 
 extend({
   Container,
@@ -123,6 +125,7 @@ const App = observer(() => {
   const handlePointerDown = (e: PointerEvent) => {
     const currentMode = canvasStore.mode.get();
     const currentPosition = canvasStore.position.get();
+    const worldPos = screenToWorld(e.clientX, e.clientY);
 
     if (currentMode === 'pan') {
       // 패닝 모드
@@ -132,7 +135,6 @@ const App = observer(() => {
       );
     } else if (currentMode === 'draw') {
       // 그리기 모드
-      const worldPos = screenToWorld(e.clientX, e.clientY);
       const newRect: Rectangle = {
         id: `rect-${Date.now()}`,
         x: worldPos.x,
@@ -142,6 +144,36 @@ const App = observer(() => {
         color: '#ff0000',
       };
       canvasActions.startDrawing(newRect);
+    } else if (currentMode === 'select') {
+      // 선택 모드
+      const selectedId = canvasStore.selectedRectId.get();
+      const rectangles = canvasStore.rectangles.get();
+      const currentScale = canvasStore.scale.get();
+
+      // 현재 선택된 사각형이 있으면 핸들 체크
+      if (selectedId) {
+        const selectedRect = rectangles.find((r) => r.id === selectedId);
+        if (selectedRect) {
+          const handle = getHandleAtPosition(
+            worldPos,
+            selectedRect,
+            currentScale
+          );
+          if (handle) {
+            // 핸들 클릭 - 리사이즈 시작
+            canvasActions.startResize(handle, selectedRect);
+            return;
+          }
+        }
+      }
+
+      // 핸들이 아니면 사각형 선택 체크
+      const clickedRect = findRectAtPosition(worldPos, rectangles);
+      if (clickedRect) {
+        canvasActions.selectRectangle(clickedRect.id);
+      } else {
+        canvasActions.selectRectangle(null);
+      }
     }
   };
 
@@ -150,6 +182,8 @@ const App = observer(() => {
     const currentIsDragging = canvasStore.isDragging.get();
     const currentIsDrawing = canvasStore.isDrawing.get();
     const currentDrawingRect = canvasStore.drawingRect.get();
+    const currentIsResizing = canvasStore.isResizing.get();
+    const worldPos = screenToWorld(e.clientX, e.clientY);
 
     if (currentMode === 'pan' && currentIsDragging) {
       // 패닝
@@ -170,24 +204,29 @@ const App = observer(() => {
       currentDrawingRect
     ) {
       // 사각형 그리기
-      const worldPos = screenToWorld(e.clientX, e.clientY);
       const updatedRect: Rectangle = {
         ...currentDrawingRect,
         width: worldPos.x - currentDrawingRect.x,
         height: worldPos.y - currentDrawingRect.y,
       };
       canvasActions.updateDrawing(updatedRect);
+    } else if (currentMode === 'select' && currentIsResizing) {
+      // 사각형 리사이즈
+      canvasActions.updateResize(worldPos);
     }
   };
 
   const handlePointerUp = () => {
     const currentMode = canvasStore.mode.get();
     const currentIsDrawing = canvasStore.isDrawing.get();
+    const currentIsResizing = canvasStore.isResizing.get();
 
     if (currentMode === 'pan') {
       canvasActions.endDrag();
     } else if (currentMode === 'draw' && currentIsDrawing) {
       canvasActions.finishDrawing();
+    } else if (currentMode === 'select' && currentIsResizing) {
+      canvasActions.endResize();
     }
   };
 
@@ -198,6 +237,8 @@ const App = observer(() => {
         canvasActions.setMode('pan');
       } else if (e.key === 'd' || e.key === 'D') {
         canvasActions.setMode('draw');
+      } else if (e.key === 's' || e.key === 'S') {
+        canvasActions.setMode('select');
       } else if (e.key === 'Escape') {
         canvasActions.setMode('pan');
         const currentIsDrawing = canvasStore.isDrawing.get();
@@ -205,7 +246,12 @@ const App = observer(() => {
           canvasActions.finishDrawing();
         }
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
-        canvasActions.clearRectangles();
+        const selectedId = canvasStore.selectedRectId.get();
+        if (selectedId) {
+          canvasActions.removeRectangle(selectedId);
+        } else {
+          canvasActions.clearRectangles();
+        }
       }
     };
 
@@ -222,8 +268,26 @@ const App = observer(() => {
   const getCursor = () => {
     const currentMode = canvasStore.mode.get();
     const currentIsDragging = canvasStore.isDragging.get();
+    const currentIsResizing = canvasStore.isResizing.get();
+    const resizeHandle = canvasStore.resizeHandle.get();
+
+    if (currentIsResizing && resizeHandle) {
+      // 리사이즈 커서
+      const cursorMap = {
+        nw: 'nw-resize',
+        ne: 'ne-resize',
+        sw: 'sw-resize',
+        se: 'se-resize',
+        n: 'n-resize',
+        s: 's-resize',
+        w: 'w-resize',
+        e: 'e-resize',
+      };
+      return cursorMap[resizeHandle];
+    }
 
     if (currentMode === 'draw') return 'crosshair';
+    if (currentMode === 'select') return 'pointer';
     if (currentIsDragging) return 'grabbing';
     return 'grab';
   };
@@ -234,6 +298,10 @@ const App = observer(() => {
   const mode = canvasStore.mode.get();
   const rectangles = canvasStore.rectangles.get();
   const drawingRect = canvasStore.drawingRect.get();
+  const selectedRectId = canvasStore.selectedRectId.get();
+  const selectedRect = selectedRectId
+    ? rectangles.find((r) => r.id === selectedRectId) || null
+    : null;
 
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh' }}>
@@ -278,7 +346,27 @@ const App = observer(() => {
           그리기 (D)
         </button>
         <button
-          onClick={() => canvasActions.clearRectangles()}
+          onClick={() => canvasActions.setMode('select')}
+          style={{
+            background: mode === 'select' ? '#007bff' : '#333',
+            color: 'white',
+            border: 'none',
+            padding: '8px 16px',
+            borderRadius: '3px',
+            cursor: 'pointer',
+          }}
+        >
+          선택 (S)
+        </button>
+        <button
+          onClick={() => {
+            const selectedId = canvasStore.selectedRectId.get();
+            if (selectedId) {
+              canvasActions.removeRectangle(selectedId);
+            } else {
+              canvasActions.clearRectangles();
+            }
+          }}
           style={{
             background: '#dc3545',
             color: 'white',
@@ -288,10 +376,10 @@ const App = observer(() => {
             cursor: 'pointer',
           }}
         >
-          모두 삭제 (Del)
+          {selectedRectId ? '선택 삭제' : '모두 삭제'} (Del)
         </button>
         <div style={{ color: 'white', alignSelf: 'center' }}>
-          사각형: {rectangles.length}개
+          사각형: {rectangles.length}개{selectedRectId && ' | 선택됨: 1개'}
         </div>
       </div>
 
@@ -326,6 +414,7 @@ const App = observer(() => {
               rectangles={rectangles}
               drawingRect={drawingRect}
             />
+            <SelectionHandles selectedRect={selectedRect} scale={scale} />
           </pixiContainer>
         </Application>
       </div>
