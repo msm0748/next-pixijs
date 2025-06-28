@@ -167,11 +167,14 @@ const App = observer(() => {
         }
       }
 
-      // 핸들이 아니면 사각형 선택 체크
+      // 사각형 클릭 체크 (선택된 사각형이든 다른 사각형이든)
       const clickedRect = findRectAtPosition(worldPos, rectangles);
       if (clickedRect) {
+        // 사각형 선택과 동시에 이동 시작
         canvasActions.selectRectangle(clickedRect.id);
+        canvasActions.startMove(worldPos, clickedRect);
       } else {
+        // 빈 공간 클릭 - 선택 해제
         canvasActions.selectRectangle(null);
       }
     }
@@ -183,6 +186,7 @@ const App = observer(() => {
     const currentIsDrawing = canvasStore.isDrawing.get();
     const currentDrawingRect = canvasStore.drawingRect.get();
     const currentIsResizing = canvasStore.isResizing.get();
+    const currentIsMoving = canvasStore.isMoving.get();
     const worldPos = screenToWorld(e.clientX, e.clientY);
 
     if (currentMode === 'pan' && currentIsDragging) {
@@ -213,6 +217,9 @@ const App = observer(() => {
     } else if (currentMode === 'select' && currentIsResizing) {
       // 사각형 리사이즈
       canvasActions.updateResize(worldPos);
+    } else if (currentMode === 'select' && currentIsMoving) {
+      // 사각형 이동
+      canvasActions.updateMove(worldPos);
     }
   };
 
@@ -220,6 +227,7 @@ const App = observer(() => {
     const currentMode = canvasStore.mode.get();
     const currentIsDrawing = canvasStore.isDrawing.get();
     const currentIsResizing = canvasStore.isResizing.get();
+    const currentIsMoving = canvasStore.isMoving.get();
 
     if (currentMode === 'pan') {
       canvasActions.endDrag();
@@ -227,6 +235,8 @@ const App = observer(() => {
       canvasActions.finishDrawing();
     } else if (currentMode === 'select' && currentIsResizing) {
       canvasActions.endResize();
+    } else if (currentMode === 'select' && currentIsMoving) {
+      canvasActions.endMove();
     }
   };
 
@@ -269,6 +279,7 @@ const App = observer(() => {
     const currentMode = canvasStore.mode.get();
     const currentIsDragging = canvasStore.isDragging.get();
     const currentIsResizing = canvasStore.isResizing.get();
+    const currentIsMoving = canvasStore.isMoving.get();
     const resizeHandle = canvasStore.resizeHandle.get();
 
     if (currentIsResizing && resizeHandle) {
@@ -286,6 +297,7 @@ const App = observer(() => {
       return cursorMap[resizeHandle];
     }
 
+    if (currentIsMoving) return 'move';
     if (currentMode === 'draw') return 'crosshair';
     if (currentMode === 'select') return 'pointer';
     if (currentIsDragging) return 'grabbing';

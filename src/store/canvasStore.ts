@@ -31,6 +31,11 @@ export interface CanvasState {
   resizeHandle: 'nw' | 'ne' | 'sw' | 'se' | 'n' | 'e' | 's' | 'w' | null;
   resizeStartRect: Rectangle | null;
 
+  // 이동 상태
+  isMoving: boolean;
+  moveStartPos: { x: number; y: number } | null;
+  moveStartRect: Rectangle | null;
+
   // 모드
   mode: 'pan' | 'draw' | 'select'; // 선택 모드 추가
 }
@@ -55,6 +60,11 @@ export const canvasStore = observable<CanvasState>({
   isResizing: false,
   resizeHandle: null,
   resizeStartRect: null,
+
+  // 이동 상태
+  isMoving: false,
+  moveStartPos: null,
+  moveStartRect: null,
 
   // 모드
   mode: 'pan',
@@ -197,6 +207,46 @@ export const canvasActions = {
     canvasStore.isResizing.set(false);
     canvasStore.resizeHandle.set(null);
     canvasStore.resizeStartRect.set(null);
+  },
+
+  // 이동 관련
+  startMove: (worldPos: { x: number; y: number }, rect: Rectangle) => {
+    canvasStore.isMoving.set(true);
+    canvasStore.moveStartPos.set(worldPos);
+    canvasStore.moveStartRect.set({ ...rect });
+  },
+
+  updateMove: (worldPos: { x: number; y: number }) => {
+    const startPos = canvasStore.moveStartPos.get();
+    const startRect = canvasStore.moveStartRect.get();
+    const selectedId = canvasStore.selectedRectId.get();
+
+    if (!startPos || !startRect || !selectedId) return;
+
+    const rectangles = canvasStore.rectangles.get();
+    const rectIndex = rectangles.findIndex((r) => r.id === selectedId);
+    if (rectIndex === -1) return;
+
+    // 이동량 계산
+    const deltaX = worldPos.x - startPos.x;
+    const deltaY = worldPos.y - startPos.y;
+
+    // 새 위치 적용
+    const newRect = {
+      ...startRect,
+      x: startRect.x + deltaX,
+      y: startRect.y + deltaY,
+    };
+
+    const updatedRectangles = [...rectangles];
+    updatedRectangles[rectIndex] = newRect;
+    canvasStore.rectangles.set(updatedRectangles);
+  },
+
+  endMove: () => {
+    canvasStore.isMoving.set(false);
+    canvasStore.moveStartPos.set(null);
+    canvasStore.moveStartRect.set(null);
   },
 
   removeRectangle: (id: string) => {
