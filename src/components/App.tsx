@@ -243,6 +243,7 @@ const App = observer(() => {
   // 키보드 단축키
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      e.preventDefault();
       if (e.key === 'p' || e.key === 'P') {
         canvasActions.setMode('pan');
       } else if (e.key === 'd' || e.key === 'D') {

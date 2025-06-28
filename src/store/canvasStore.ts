@@ -1,5 +1,15 @@
 import { observable } from '@legendapp/state';
 
+// 사각형 좌표를 정규화하는 함수
+const normalizeRect = (rect: Rectangle) => {
+  const x = rect.width < 0 ? rect.x + rect.width : rect.x;
+  const y = rect.height < 0 ? rect.y + rect.height : rect.y;
+  const width = Math.abs(rect.width);
+  const height = Math.abs(rect.height);
+
+  return { x, y, width, height };
+};
+
 export interface Rectangle {
   id: string;
   x: number;
@@ -140,7 +150,17 @@ export const canvasActions = {
   ) => {
     canvasStore.isResizing.set(true);
     canvasStore.resizeHandle.set(handle);
-    canvasStore.resizeStartRect.set({ ...rect });
+    // 음수 크기 사각형을 정규화하여 저장
+    const normalized = normalizeRect(rect);
+    canvasStore.resizeStartRect.set({
+      id: rect.id,
+      x: normalized.x,
+      y: normalized.y,
+      width: normalized.width,
+      height: normalized.height,
+      color: rect.color,
+      label: rect.label,
+    });
   },
 
   updateResize: (worldPos: { x: number; y: number }) => {
@@ -154,9 +174,10 @@ export const canvasActions = {
     const rectIndex = rectangles.findIndex((r) => r.id === selectedId);
     if (rectIndex === -1) return;
 
+    // startRect는 이미 정규화된 상태 (양수 width/height)
     const newRect = { ...startRect };
 
-    // 핸들에 따른 리사이즈 로직
+    // 핸들에 따른 리사이즈 로직 (정규화된 좌표 기준)
     switch (handle) {
       case 'nw': // 왼쪽 위
         newRect.width = startRect.x + startRect.width - worldPos.x;
@@ -194,7 +215,7 @@ export const canvasActions = {
         break;
     }
 
-    // 최소 크기 제한
+    // 최소 크기 제한 (절댓값으로 체크)
     if (Math.abs(newRect.width) < 10) return;
     if (Math.abs(newRect.height) < 10) return;
 
