@@ -63,9 +63,26 @@ export interface CanvasState {
   moveStartRect: Rectangle | null;
   moveStartPolygon: Polygon | null;
 
+  // 폴리곤 편집 상태
+  isEditingPolygon: boolean;
+  editingPointIndex: number | null;
+  editStartPoint: { x: number; y: number } | null;
+
   // 모드
   mode: 'pan' | 'draw' | 'polygon' | 'select'; // 폴리곤 모드 추가
 }
+
+// 폴리곤 2000개 미리 생성
+
+const dummyPolygons = Array.from({ length: 1000 }, (_, i) => ({
+  id: `${i + 1}`,
+  points: [
+    { x: 100 + (i % 100) * 10, y: 100 + Math.floor(i / 100) * 10 },
+    { x: 200 + (i % 100) * 10, y: 100 + Math.floor(i / 100) * 10 },
+    { x: 200 + (i % 100) * 10, y: 200 + Math.floor(i / 100) * 10 },
+  ],
+  isComplete: true,
+}));
 
 export const canvasStore = observable<CanvasState>({
   // 뷰포트 상태
@@ -85,7 +102,7 @@ export const canvasStore = observable<CanvasState>({
   // 폴리곤 상태
   isDrawingPolygon: false,
   currentPolygon: null,
-  polygons: [],
+  polygons: dummyPolygons,
   hoveredPointIndex: null,
   currentMousePosition: null,
 
@@ -101,6 +118,11 @@ export const canvasStore = observable<CanvasState>({
   moveStartPos: null,
   moveStartRect: null,
   moveStartPolygon: null,
+
+  // 폴리곤 편집 상태
+  isEditingPolygon: false,
+  editingPointIndex: null,
+  editStartPoint: null,
 
   // 모드
   mode: 'pan',
@@ -426,6 +448,94 @@ export const canvasActions = {
     canvasStore.moveStartPos.set(null);
     canvasStore.moveStartRect.set(null);
     canvasStore.moveStartPolygon.set(null);
+  },
+
+  // 폴리곤 편집 관련
+  startEditPolygonPoint: (
+    pointIndex: number,
+    point: { x: number; y: number }
+  ) => {
+    canvasStore.isEditingPolygon.set(true);
+    canvasStore.editingPointIndex.set(pointIndex);
+    canvasStore.editStartPoint.set(point);
+  },
+
+  updateEditPolygonPoint: (worldPos: { x: number; y: number }) => {
+    const pointIndex = canvasStore.editingPointIndex.get();
+    const selectedPolygonId = canvasStore.selectedPolygonId.get();
+
+    if (pointIndex === null || !selectedPolygonId) return;
+
+    const polygons = canvasStore.polygons.get();
+    const polygonIndex = polygons.findIndex((p) => p.id === selectedPolygonId);
+    if (polygonIndex === -1) return;
+
+    const updatedPolygons = [...polygons];
+    const updatedPoints = [...updatedPolygons[polygonIndex].points];
+    updatedPoints[pointIndex] = worldPos;
+
+    updatedPolygons[polygonIndex] = {
+      ...updatedPolygons[polygonIndex],
+      points: updatedPoints,
+    };
+
+    canvasStore.polygons.set(updatedPolygons);
+  },
+
+  endEditPolygonPoint: () => {
+    canvasStore.isEditingPolygon.set(false);
+    canvasStore.editingPointIndex.set(null);
+    canvasStore.editStartPoint.set(null);
+  },
+
+  addPolygonPointAtEdge: (
+    edgeIndex: number,
+    position: { x: number; y: number }
+  ) => {
+    const selectedPolygonId = canvasStore.selectedPolygonId.get();
+    if (!selectedPolygonId) return;
+
+    const polygons = canvasStore.polygons.get();
+    const polygonIndex = polygons.findIndex((p) => p.id === selectedPolygonId);
+    if (polygonIndex === -1) return;
+
+    const updatedPolygons = [...polygons];
+    const updatedPoints = [...updatedPolygons[polygonIndex].points];
+
+    // edgeIndex 다음 위치에 새 점 삽입
+    updatedPoints.splice(edgeIndex + 1, 0, position);
+
+    updatedPolygons[polygonIndex] = {
+      ...updatedPolygons[polygonIndex],
+      points: updatedPoints,
+    };
+
+    canvasStore.polygons.set(updatedPolygons);
+  },
+
+  removePolygonPoint: (pointIndex: number) => {
+    const selectedPolygonId = canvasStore.selectedPolygonId.get();
+    if (!selectedPolygonId) return;
+
+    const polygons = canvasStore.polygons.get();
+    const polygonIndex = polygons.findIndex((p) => p.id === selectedPolygonId);
+    if (polygonIndex === -1) return;
+
+    const polygon = polygons[polygonIndex];
+
+    // 최소 3개 점은 유지
+    if (polygon.points.length <= 3) return;
+
+    const updatedPolygons = [...polygons];
+    const updatedPoints = [...polygon.points];
+    updatedPoints.splice(pointIndex, 1);
+
+    updatedPolygons[polygonIndex] = {
+      ...updatedPolygons[polygonIndex],
+      points: updatedPoints,
+    };
+
+    canvasStore.polygons.set(updatedPolygons);
   },
 
   removeRectangle: (id: string) => {

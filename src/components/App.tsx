@@ -8,7 +8,14 @@ import { canvasStore, canvasActions, Rectangle } from '../store/canvasStore';
 import { RectangleRenderer } from './RectangleRenderer';
 import { PolygonRenderer } from './PolygonRenderer';
 import { SelectionHandles, getHandleAtPosition } from './SelectionHandles';
+import {
+  PolygonSelectionHandles,
+  getPointHandleAtPosition,
+  getEdgeMidpointAtPosition,
+  getPointOnEdge,
+} from './PolygonSelectionHandles';
 import { findRectAtPosition } from '../utils/rectUtils';
+import { findPolygonAtPosition } from '../utils/polygonUtils';
 
 extend({
   Container,
@@ -158,13 +165,15 @@ const App = observer(() => {
       }
     } else if (currentMode === 'select') {
       // 선택 모드
-      const selectedId = canvasStore.selectedRectId.get();
+      const selectedRectId = canvasStore.selectedRectId.get();
+      const selectedPolygonId = canvasStore.selectedPolygonId.get();
       const rectangles = canvasStore.rectangles.get();
+      const polygons = canvasStore.polygons.get();
       const currentScale = canvasStore.scale.get();
 
       // 현재 선택된 사각형이 있으면 핸들 체크
-      if (selectedId) {
-        const selectedRect = rectangles.find((r) => r.id === selectedId);
+      if (selectedRectId) {
+        const selectedRect = rectangles.find((r) => r.id === selectedRectId);
         if (selectedRect) {
           const handle = getHandleAtPosition(
             worldPos,
@@ -179,16 +188,88 @@ const App = observer(() => {
         }
       }
 
+      // 현재 선택된 폴리곤이 있으면 핸들 체크
+      if (selectedPolygonId) {
+        const selectedPolygon = polygons.find(
+          (p) => p.id === selectedPolygonId
+        );
+        if (selectedPolygon) {
+          // 점 핸들 체크
+          const pointIndex = getPointHandleAtPosition(
+            worldPos,
+            selectedPolygon,
+            currentScale
+          );
+          if (pointIndex !== null) {
+            // 점 편집 시작
+            canvasActions.startEditPolygonPoint(
+              pointIndex,
+              selectedPolygon.points[pointIndex]
+            );
+            return;
+          }
+
+          // 선분 중점 핸들 체크 (새 점 추가)
+          const edgeMidpoint = getEdgeMidpointAtPosition(
+            worldPos,
+            selectedPolygon,
+            currentScale
+          );
+          if (edgeMidpoint) {
+            // 선분 중점에 새 점 추가하고 바로 편집 모드로
+            canvasActions.addPolygonPointAtEdge(
+              edgeMidpoint.edgeIndex,
+              edgeMidpoint.position
+            );
+            canvasActions.startEditPolygonPoint(
+              edgeMidpoint.edgeIndex + 1,
+              edgeMidpoint.position
+            );
+            return;
+          }
+
+          // 선분 위 클릭 체크 (새 점 추가)
+          const pointOnEdge = getPointOnEdge(
+            worldPos,
+            selectedPolygon,
+            currentScale
+          );
+          if (pointOnEdge) {
+            // 선분 위에 새 점 추가하고 바로 편집 모드로
+            canvasActions.addPolygonPointAtEdge(
+              pointOnEdge.edgeIndex,
+              pointOnEdge.position
+            );
+            canvasActions.startEditPolygonPoint(
+              pointOnEdge.edgeIndex + 1,
+              pointOnEdge.position
+            );
+            return;
+          }
+        }
+      }
+
       // 사각형 클릭 체크 (선택된 사각형이든 다른 사각형이든)
       const clickedRect = findRectAtPosition(worldPos, rectangles);
       if (clickedRect) {
         // 사각형 선택과 동시에 이동 시작
         canvasActions.selectRectangle(clickedRect.id);
         canvasActions.startMove(worldPos, clickedRect);
-      } else {
-        // 빈 공간 클릭 - 선택 해제
-        canvasActions.selectRectangle(null);
+        return;
       }
+
+      // 폴리곤 클릭 체크
+      const clickedPolygon = findPolygonAtPosition(worldPos, polygons);
+      if (clickedPolygon) {
+        // 폴리곤 선택과 동시에 이동 시작
+        canvasActions.selectPolygon(clickedPolygon.id);
+        canvasActions.startMove(worldPos, undefined, clickedPolygon);
+        return;
+      }
+
+      // 빈 공간 클릭 - 선택 해제
+      canvasActions.selectRectangle(null);
+      canvasActions.selectPolygon(null);
     }
   };
 
@@ -233,8 +314,11 @@ const App = observer(() => {
       // 사각형 리사이즈
       canvasActions.updateResize(worldPos);
     } else if (currentMode === 'select' && currentIsMoving) {
-      // 사각형 이동
+      // 사각형/폴리곤 이동
       canvasActions.updateMove(worldPos);
+    } else if (currentMode === 'select' && canvasStore.isEditingPolygon.get()) {
+      // 폴리곤 점 편집
+      canvasActions.updateEditPolygonPoint(worldPos);
     }
   };
 
@@ -243,6 +327,7 @@ const App = observer(() => {
     const currentIsDrawing = canvasStore.isDrawing.get();
     const currentIsResizing = canvasStore.isResizing.get();
     const currentIsMoving = canvasStore.isMoving.get();
+    const currentIsEditingPolygon = canvasStore.isEditingPolygon.get();
 
     if (currentMode === 'pan') {
       canvasActions.endDrag();
@@ -252,6 +337,36 @@ const App = observer(() => {
       canvasActions.endResize();
     } else if (currentMode === 'select' && currentIsMoving) {
       canvasActions.endMove();
+    } else if (currentMode === 'select' && currentIsEditingPolygon) {
+      canvasActions.endEditPolygonPoint();
+    }
+  };
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault(); // 기본 컨텍스트 메뉴 방지
+
+    const currentMode = canvasStore.mode.get();
+    if (currentMode !== 'select') return;
+
+    const worldPos = screenToWorld(e.clientX, e.clientY);
+    const selectedPolygonId = canvasStore.selectedPolygonId.get();
+    const polygons = canvasStore.polygons.get();
+    const currentScale = canvasStore.scale.get();
+
+    if (selectedPolygonId) {
+      const selectedPolygon = polygons.find((p) => p.id === selectedPolygonId);
+      if (selectedPolygon) {
+        // 점 핸들 체크
+        const pointIndex = getPointHandleAtPosition(
+          worldPos,
+          selectedPolygon,
+          currentScale
+        );
+        if (pointIndex !== null && selectedPolygon.points.length > 3) {
+          // 점 삭제 (최소 3개 점은 유지)
+          canvasActions.removePolygonPoint(pointIndex);
+        }
+      }
     }
   };
 
@@ -278,11 +393,15 @@ const App = observer(() => {
         }
         canvasActions.setMode('pan');
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
-        const selectedId = canvasStore.selectedRectId.get();
-        if (selectedId) {
-          canvasActions.removeRectangle(selectedId);
+        const selectedRectId = canvasStore.selectedRectId.get();
+        const selectedPolygonId = canvasStore.selectedPolygonId.get();
+
+        if (selectedRectId) {
+          canvasActions.removeRectangle(selectedRectId);
+        } else if (selectedPolygonId) {
+          canvasActions.removePolygon(selectedPolygonId);
         } else {
-          canvasActions.clearRectangles();
+          canvasActions.clearAll();
         }
       }
     };
@@ -343,6 +462,10 @@ const App = observer(() => {
   const currentPolygon = canvasStore.currentPolygon.get();
   const hoveredPointIndex = canvasStore.hoveredPointIndex.get();
   const currentMousePosition = canvasStore.currentMousePosition.get();
+  const selectedPolygonId = canvasStore.selectedPolygonId.get();
+  const selectedPolygon = selectedPolygonId
+    ? polygons.find((p) => p.id === selectedPolygonId) || null
+    : null;
 
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh' }}>
@@ -414,11 +537,15 @@ const App = observer(() => {
         </button>
         <button
           onClick={() => {
-            const selectedId = canvasStore.selectedRectId.get();
-            if (selectedId) {
-              canvasActions.removeRectangle(selectedId);
+            const selectedRectId = canvasStore.selectedRectId.get();
+            const selectedPolygonId = canvasStore.selectedPolygonId.get();
+
+            if (selectedRectId) {
+              canvasActions.removeRectangle(selectedRectId);
+            } else if (selectedPolygonId) {
+              canvasActions.removePolygon(selectedPolygonId);
             } else {
-              canvasActions.clearRectangles();
+              canvasActions.clearAll();
             }
           }}
           style={{
@@ -430,10 +557,13 @@ const App = observer(() => {
             cursor: 'pointer',
           }}
         >
-          {selectedRectId ? '선택 삭제' : '모두 삭제'} (Del)
+          {selectedRectId || selectedPolygonId ? '선택 삭제' : '모두 삭제'}{' '}
+          (Del)
         </button>
         <div style={{ color: 'white', alignSelf: 'center' }}>
-          사각형: {rectangles.length}개{selectedRectId && ' | 선택됨: 1개'}
+          사각형: {rectangles.length}개 | 폴리곤: {polygons.length}개
+          {selectedRectId && ' | 사각형 선택됨'}
+          {selectedPolygonId && ' | 폴리곤 선택됨'}
         </div>
       </div>
 
@@ -444,6 +574,7 @@ const App = observer(() => {
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
+        onContextMenu={handleContextMenu}
         style={{
           cursor: getCursor(),
           width: '100vw',
@@ -475,6 +606,10 @@ const App = observer(() => {
               currentMousePosition={currentMousePosition}
             />
             <SelectionHandles selectedRect={selectedRect} scale={scale} />
+            <PolygonSelectionHandles
+              selectedPolygon={selectedPolygon}
+              scale={scale}
+            />
           </pixiContainer>
         </Application>
       </div>
