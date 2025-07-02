@@ -11,7 +11,6 @@ import { SelectionHandles, getHandleAtPosition } from './SelectionHandles';
 import {
   PolygonSelectionHandles,
   getPointHandleAtPosition,
-  getEdgeMidpointAtPosition,
   getPointOnEdge,
 } from './PolygonSelectionHandles';
 import { findRectAtPosition } from '../utils/rectUtils';
@@ -201,29 +200,10 @@ const App = observer(() => {
             currentScale
           );
           if (pointIndex !== null) {
-            // 점 편집 시작
+            // 점 편집 시작 (마우스업에서 움직임이 없으면 삭제로 처리)
             canvasActions.startEditPolygonPoint(
               pointIndex,
               selectedPolygon.points[pointIndex]
-            );
-            return;
-          }
-
-          // 선분 중점 핸들 체크 (새 점 추가)
-          const edgeMidpoint = getEdgeMidpointAtPosition(
-            worldPos,
-            selectedPolygon,
-            currentScale
-          );
-          if (edgeMidpoint) {
-            // 선분 중점에 새 점 추가하고 바로 편집 모드로
-            canvasActions.addPolygonPointAtEdge(
-              edgeMidpoint.edgeIndex,
-              edgeMidpoint.position
-            );
-            canvasActions.startEditPolygonPoint(
-              edgeMidpoint.edgeIndex + 1,
-              edgeMidpoint.position
             );
             return;
           }
@@ -338,36 +318,35 @@ const App = observer(() => {
     } else if (currentMode === 'select' && currentIsMoving) {
       canvasActions.endMove();
     } else if (currentMode === 'select' && currentIsEditingPolygon) {
+      // 폴리곤 점 편집 종료 시 움직임이 없었으면 삭제
+      const editingPointIndex = canvasStore.editingPointIndex.get();
+      const editStartPoint = canvasStore.editStartPoint.get();
+      const selectedPolygonId = canvasStore.selectedPolygonId.get();
+
+      if (editingPointIndex !== null && editStartPoint && selectedPolygonId) {
+        const polygons = canvasStore.polygons.get();
+        const selectedPolygon = polygons.find(
+          (p) => p.id === selectedPolygonId
+        );
+
+        if (selectedPolygon) {
+          const currentPoint = selectedPolygon.points[editingPointIndex];
+          const deltaX = Math.abs(currentPoint.x - editStartPoint.x);
+          const deltaY = Math.abs(currentPoint.y - editStartPoint.y);
+
+          // 움직임이 5픽셀 이하면 삭제로 간주
+          if (deltaX < 5 && deltaY < 5 && selectedPolygon.points.length > 3) {
+            canvasActions.removePolygonPoint(editingPointIndex);
+          }
+        }
+      }
+
       canvasActions.endEditPolygonPoint();
     }
   };
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault(); // 기본 컨텍스트 메뉴 방지
-
-    const currentMode = canvasStore.mode.get();
-    if (currentMode !== 'select') return;
-
-    const worldPos = screenToWorld(e.clientX, e.clientY);
-    const selectedPolygonId = canvasStore.selectedPolygonId.get();
-    const polygons = canvasStore.polygons.get();
-    const currentScale = canvasStore.scale.get();
-
-    if (selectedPolygonId) {
-      const selectedPolygon = polygons.find((p) => p.id === selectedPolygonId);
-      if (selectedPolygon) {
-        // 점 핸들 체크
-        const pointIndex = getPointHandleAtPosition(
-          worldPos,
-          selectedPolygon,
-          currentScale
-        );
-        if (pointIndex !== null && selectedPolygon.points.length > 3) {
-          // 점 삭제 (최소 3개 점은 유지)
-          canvasActions.removePolygonPoint(pointIndex);
-        }
-      }
-    }
   };
 
   // 키보드 단축키
@@ -563,7 +542,8 @@ const App = observer(() => {
         <div style={{ color: 'white', alignSelf: 'center' }}>
           사각형: {rectangles.length}개 | 폴리곤: {polygons.length}개
           {selectedRectId && ' | 사각형 선택됨'}
-          {selectedPolygonId && ' | 폴리곤 선택됨'}
+          {selectedPolygonId &&
+            ' | 폴리곤 선택됨 (클릭: 점 삭제, 드래그: 점 이동)'}
         </div>
       </div>
 

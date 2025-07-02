@@ -62,43 +62,7 @@ export const PolygonSelectionHandles = ({
         });
         graphics.circle(point.x, point.y, halfHandle);
         graphics.stroke();
-
-        // 점 인덱스 표시 (작은 텍스트)
-        // PIXI의 Text는 Graphics에서 직접 사용할 수 없으므로 생략
       });
-
-      // 선분 중점에 작은 핸들 표시 (새 점 추가용)
-      for (let i = 0; i < selectedPolygon.points.length; i++) {
-        const currentPoint = selectedPolygon.points[i];
-        const nextPoint =
-          selectedPolygon.points[(i + 1) % selectedPolygon.points.length];
-
-        // 완성되지 않은 폴리곤의 마지막 선분은 제외
-        if (
-          !selectedPolygon.isComplete &&
-          i === selectedPolygon.points.length - 1
-        ) {
-          continue;
-        }
-
-        const midX = (currentPoint.x + nextPoint.x) / 2;
-        const midY = (currentPoint.y + nextPoint.y) / 2;
-
-        // 중점 핸들 (더 작게, 반투명)
-        graphics.setFillStyle({
-          color: 0x00ff00,
-          alpha: 0.7,
-        });
-        graphics.circle(midX, midY, halfHandle * 0.6);
-        graphics.fill();
-
-        graphics.setStrokeStyle({
-          color: 0x00aa00,
-          width: 1 / scale,
-        });
-        graphics.circle(midX, midY, halfHandle * 0.6);
-        graphics.stroke();
-      }
     },
     [selectedPolygon, scale]
   );
@@ -123,42 +87,6 @@ export const getPointHandleAtPosition = (
 
     if (distance <= tolerance) {
       return i;
-    }
-  }
-
-  return null;
-};
-
-// 선분 중점 핸들 히트 테스트 유틸리티 함수
-export const getEdgeMidpointAtPosition = (
-  worldPos: { x: number; y: number },
-  polygon: Polygon,
-  scale: number
-): { edgeIndex: number; position: { x: number; y: number } } | null => {
-  const handleSize = 8 / scale;
-  const tolerance = handleSize * 0.6;
-
-  for (let i = 0; i < polygon.points.length; i++) {
-    const currentPoint = polygon.points[i];
-    const nextPoint = polygon.points[(i + 1) % polygon.points.length];
-
-    // 완성되지 않은 폴리곤의 마지막 선분은 제외
-    if (!polygon.isComplete && i === polygon.points.length - 1) {
-      continue;
-    }
-
-    const midX = (currentPoint.x + nextPoint.x) / 2;
-    const midY = (currentPoint.y + nextPoint.y) / 2;
-
-    const dx = worldPos.x - midX;
-    const dy = worldPos.y - midY;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-
-    if (distance <= tolerance) {
-      return {
-        edgeIndex: i,
-        position: { x: midX, y: midY },
-      };
     }
   }
 
