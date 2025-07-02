@@ -917,6 +917,7 @@ const App = observer(() => {
           width={typeof window !== 'undefined' ? window.innerWidth : 800}
           height={typeof window !== 'undefined' ? window.innerHeight : 600}
           backgroundAlpha={0}
+          resizeTo={containerRef}
         >
           <pixiContainer x={position.x} y={position.y} scale={scale}>
             <ImageFilter brightness={brightness} contrast={contrast}>
