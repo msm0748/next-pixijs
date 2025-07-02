@@ -16,6 +16,7 @@ import {
 import { Crosshair } from './Crosshair';
 import { findRectAtPosition } from '../utils/rectUtils';
 import { findPolygonAtPosition } from '../utils/polygonUtils';
+import { downloadLabels } from '../utils/downloadUtils';
 
 extend({
   Container,
@@ -562,6 +563,26 @@ const App = observer(() => {
         >
           {selectedRectId || selectedPolygonId ? '선택 삭제' : '모두 삭제'}{' '}
           (Del)
+        </button>
+        <button
+          onClick={() => {
+            const currentDate = new Date();
+            const timestamp = currentDate
+              .toISOString()
+              .replace(/[:.]/g, '-')
+              .split('T')[0];
+            downloadLabels(rectangles, polygons, `labels_${timestamp}`);
+          }}
+          style={{
+            background: '#28a745',
+            color: 'white',
+            border: 'none',
+            padding: '8px 16px',
+            borderRadius: '3px',
+            cursor: 'pointer',
+          }}
+        >
+          라벨 다운로드
         </button>
         <div style={{ color: 'white', alignSelf: 'center' }}>
           사각형: {rectangles.length}개 | 폴리곤: {polygons.length}개
