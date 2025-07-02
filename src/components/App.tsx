@@ -13,6 +13,7 @@ import {
   getPointHandleAtPosition,
   getPointOnEdge,
 } from './PolygonSelectionHandles';
+import { Crosshair } from './Crosshair';
 import { findRectAtPosition } from '../utils/rectUtils';
 import { findPolygonAtPosition } from '../utils/polygonUtils';
 
@@ -262,6 +263,9 @@ const App = observer(() => {
     const currentIsMoving = canvasStore.isMoving.get();
     const worldPos = screenToWorld(e.clientX, e.clientY);
 
+    // 크로스헤어 위치 업데이트
+    canvasActions.updateGlobalMousePosition(worldPos);
+
     if (currentMode === 'pan' && currentIsDragging) {
       // 패닝
       const dragStart = canvasStore.dragStart.get();
@@ -355,12 +359,16 @@ const App = observer(() => {
       e.preventDefault();
       if (e.key === 'p' || e.key === 'P') {
         canvasActions.setMode('pan');
+        canvasActions.setCrosshairVisible(false);
       } else if (e.key === 'd' || e.key === 'D') {
         canvasActions.setMode('draw');
+        canvasActions.setCrosshairVisible(true);
       } else if (e.key === 'g' || e.key === 'G') {
         canvasActions.setMode('polygon');
+        canvasActions.setCrosshairVisible(true);
       } else if (e.key === 's' || e.key === 'S') {
         canvasActions.setMode('select');
+        canvasActions.setCrosshairVisible(false);
       } else if (e.key === 'Escape') {
         const currentIsDrawing = canvasStore.isDrawing.get();
         const currentIsDrawingPolygon = canvasStore.isDrawingPolygon.get();
@@ -446,6 +454,10 @@ const App = observer(() => {
     ? polygons.find((p) => p.id === selectedPolygonId) || null
     : null;
 
+  // 크로스헤어 관련 상태들
+  const globalMousePosition = canvasStore.globalMousePosition.get();
+  const showCrosshair = canvasStore.showCrosshair.get();
+
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh' }}>
       {/* 툴바 */}
@@ -463,7 +475,10 @@ const App = observer(() => {
         }}
       >
         <button
-          onClick={() => canvasActions.setMode('pan')}
+          onClick={() => {
+            canvasActions.setMode('pan');
+            canvasActions.setCrosshairVisible(false);
+          }}
           style={{
             background: mode === 'pan' ? '#007bff' : '#333',
             color: 'white',
@@ -476,7 +491,10 @@ const App = observer(() => {
           패닝 (P)
         </button>
         <button
-          onClick={() => canvasActions.setMode('draw')}
+          onClick={() => {
+            canvasActions.setMode('draw');
+            canvasActions.setCrosshairVisible(true);
+          }}
           style={{
             background: mode === 'draw' ? '#007bff' : '#333',
             color: 'white',
@@ -489,7 +507,10 @@ const App = observer(() => {
           그리기 (D)
         </button>
         <button
-          onClick={() => canvasActions.setMode('polygon')}
+          onClick={() => {
+            canvasActions.setMode('polygon');
+            canvasActions.setCrosshairVisible(true);
+          }}
           style={{
             background: mode === 'polygon' ? '#007bff' : '#333',
             color: 'white',
@@ -502,7 +523,10 @@ const App = observer(() => {
           폴리곤 (G)
         </button>
         <button
-          onClick={() => canvasActions.setMode('select')}
+          onClick={() => {
+            canvasActions.setMode('select');
+            canvasActions.setCrosshairVisible(false);
+          }}
           style={{
             background: mode === 'select' ? '#007bff' : '#333',
             color: 'white',
@@ -553,7 +577,10 @@ const App = observer(() => {
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerUp}
+        onPointerLeave={() => {
+          handlePointerUp();
+          canvasActions.updateGlobalMousePosition(null);
+        }}
         onContextMenu={handleContextMenu}
         style={{
           cursor: getCursor(),
@@ -589,6 +616,17 @@ const App = observer(() => {
             <PolygonSelectionHandles
               selectedPolygon={selectedPolygon}
               scale={scale}
+            />
+            <Crosshair
+              mousePosition={globalMousePosition}
+              scale={scale}
+              position={position}
+              canvasSize={{
+                width: typeof window !== 'undefined' ? window.innerWidth : 800,
+                height:
+                  typeof window !== 'undefined' ? window.innerHeight : 600,
+              }}
+              visible={showCrosshair}
             />
           </pixiContainer>
         </Application>

@@ -68,13 +68,17 @@ export interface CanvasState {
   editingPointIndex: number | null;
   editStartPoint: { x: number; y: number } | null;
 
+  // 크로스헤어 상태
+  globalMousePosition: { x: number; y: number } | null;
+  showCrosshair: boolean;
+
   // 모드
   mode: 'pan' | 'draw' | 'polygon' | 'select'; // 폴리곤 모드 추가
 }
 
 // 폴리곤 2000개 미리 생성
 
-const dummyPolygons = Array.from({ length: 1000 }, (_, i) => ({
+const dummyPolygons = Array.from({ length: 2000 }, (_, i) => ({
   id: `${i + 1}`,
   points: [
     { x: 100 + (i % 100) * 10, y: 100 + Math.floor(i / 100) * 10 },
@@ -123,6 +127,10 @@ export const canvasStore = observable<CanvasState>({
   isEditingPolygon: false,
   editingPointIndex: null,
   editStartPoint: null,
+
+  // 크로스헤어 상태
+  globalMousePosition: null,
+  showCrosshair: false,
 
   // 모드
   mode: 'pan',
@@ -579,5 +587,14 @@ export const canvasActions = {
     canvasStore.currentPolygon.set(null);
     canvasStore.hoveredPointIndex.set(null);
     canvasStore.currentMousePosition.set(null);
+  },
+
+  // 크로스헤어 관련
+  updateGlobalMousePosition: (worldPos: { x: number; y: number } | null) => {
+    canvasStore.globalMousePosition.set(worldPos);
+  },
+
+  setCrosshairVisible: (visible: boolean) => {
+    canvasStore.showCrosshair.set(visible);
   },
 };
