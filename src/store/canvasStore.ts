@@ -923,4 +923,182 @@ export const canvasActions = {
       })),
     };
   },
+
+  // 이미지 중심 기준 좌표를 원본 이미지 절대 좌표로 변환
+  convertToAbsoluteCoordinates: () => {
+    const imageSize = canvasStore.imageSize.get();
+    const originalImageSize = canvasStore.originalImageSize.get();
+    const rectangles = canvasStore.rectangles.get();
+    const polygons = canvasStore.polygons.get();
+
+    // 스케일 비율 계산 (현재 이미지 크기 대비 원본 이미지 크기)
+    const scaleX = originalImageSize.width / imageSize.width;
+    const scaleY = originalImageSize.height / imageSize.height;
+
+    // 사각형들을 절대 좌표로 변환
+    const absoluteRectangles = rectangles.map((rect) => {
+      // 이미지 중심 기준 좌표 (rect.x, rect.y)를 원본 이미지 좌상단 기준으로 변환
+      const absoluteX = (rect.x + imageSize.width / 2) * scaleX;
+      const absoluteY = (rect.y + imageSize.height / 2) * scaleY;
+      const absoluteWidth = rect.width * scaleX;
+      const absoluteHeight = rect.height * scaleY;
+
+      return {
+        id: rect.id,
+        x: Math.round(absoluteX),
+        y: Math.round(absoluteY),
+        width: Math.round(absoluteWidth),
+        height: Math.round(absoluteHeight),
+        label: rect.label,
+        color: rect.color,
+      };
+    });
+
+    // 폴리곤들을 절대 좌표로 변환
+    const absolutePolygons = polygons.map((polygon) => ({
+      id: polygon.id,
+      points: polygon.points.map((point) => {
+        // 이미지 중심 기준 좌표를 원본 이미지 좌상단 기준으로 변환
+        const absoluteX = (point.x + imageSize.width / 2) * scaleX;
+        const absoluteY = (point.y + imageSize.height / 2) * scaleY;
+
+        return {
+          x: Math.round(absoluteX),
+          y: Math.round(absoluteY),
+        };
+      }),
+      isComplete: polygon.isComplete,
+      label: polygon.label,
+      color: polygon.color,
+    }));
+
+    return {
+      rectangles: absoluteRectangles,
+      polygons: absolutePolygons,
+      originalImageSize,
+      metadata: {
+        convertedAt: new Date().toISOString(),
+        imageSize: imageSize,
+        originalImageSize: originalImageSize,
+        scaleX,
+        scaleY,
+      },
+    };
+  },
+
+  // 단일 사각형을 절대 좌표로 변환
+  convertRectangleToAbsolute: (rect: Rectangle) => {
+    const imageSize = canvasStore.imageSize.get();
+    const originalImageSize = canvasStore.originalImageSize.get();
+
+    const scaleX = originalImageSize.width / imageSize.width;
+    const scaleY = originalImageSize.height / imageSize.height;
+
+    const absoluteX = (rect.x + imageSize.width / 2) * scaleX;
+    const absoluteY = (rect.y + imageSize.height / 2) * scaleY;
+    const absoluteWidth = rect.width * scaleX;
+    const absoluteHeight = rect.height * scaleY;
+
+    return {
+      id: rect.id,
+      x: Math.round(absoluteX),
+      y: Math.round(absoluteY),
+      width: Math.round(absoluteWidth),
+      height: Math.round(absoluteHeight),
+      label: rect.label,
+      color: rect.color,
+    };
+  },
+
+  // 단일 폴리곤을 절대 좌표로 변환
+  convertPolygonToAbsolute: (polygon: Polygon) => {
+    const imageSize = canvasStore.imageSize.get();
+    const originalImageSize = canvasStore.originalImageSize.get();
+
+    const scaleX = originalImageSize.width / imageSize.width;
+    const scaleY = originalImageSize.height / imageSize.height;
+
+    return {
+      id: polygon.id,
+      points: polygon.points.map((point) => {
+        const absoluteX = (point.x + imageSize.width / 2) * scaleX;
+        const absoluteY = (point.y + imageSize.height / 2) * scaleY;
+
+        return {
+          x: Math.round(absoluteX),
+          y: Math.round(absoluteY),
+        };
+      }),
+      isComplete: polygon.isComplete,
+      label: polygon.label,
+      color: polygon.color,
+    };
+  },
+
+  // 절대 좌표를 이미지 중심 기준 좌표로 변환 (서버에서 받은 데이터 복원용)
+  convertFromAbsoluteCoordinates: (
+    absoluteRectangles: Array<{
+      id: string;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      label?: string;
+      color?: string;
+    }>,
+    absolutePolygons: Array<{
+      id: string;
+      points: Array<{ x: number; y: number }>;
+      isComplete?: boolean;
+      label?: string;
+      color?: string;
+    }>,
+    serverOriginalImageSize: { width: number; height: number }
+  ) => {
+    const imageSize = canvasStore.imageSize.get();
+
+    // 서버의 원본 이미지 크기와 현재 원본 이미지 크기가 다를 수 있으므로 비율 계산
+    const scaleX = imageSize.width / serverOriginalImageSize.width;
+    const scaleY = imageSize.height / serverOriginalImageSize.height;
+
+    // 사각형들을 이미지 중심 기준 좌표로 변환
+    const rectangles = absoluteRectangles.map((rect) => {
+      const relativeX = rect.x * scaleX - imageSize.width / 2;
+      const relativeY = rect.y * scaleY - imageSize.height / 2;
+      const relativeWidth = rect.width * scaleX;
+      const relativeHeight = rect.height * scaleY;
+
+      return {
+        id: rect.id,
+        x: relativeX,
+        y: relativeY,
+        width: relativeWidth,
+        height: relativeHeight,
+        label: rect.label,
+        color: rect.color || '#ff0000',
+      };
+    });
+
+    // 폴리곤들을 이미지 중심 기준 좌표로 변환
+    const polygons = absolutePolygons.map((polygon) => ({
+      id: polygon.id,
+      points: polygon.points.map((point) => {
+        const relativeX = point.x * scaleX - imageSize.width / 2;
+        const relativeY = point.y * scaleY - imageSize.height / 2;
+
+        return {
+          x: relativeX,
+          y: relativeY,
+        };
+      }),
+      isComplete: polygon.isComplete ?? true,
+      label: polygon.label,
+      color: polygon.color || '#00ff00',
+    }));
+
+    return {
+      rectangles,
+      polygons,
+    };
+  },
 };

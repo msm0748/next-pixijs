@@ -29,6 +29,8 @@ import {
   downloadLabels,
   downloadImageWithLabels,
   sendApiData,
+  sendAbsoluteCoordinatesData,
+  downloadAbsoluteCoordinatesJson,
 } from '../utils/downloadUtils';
 
 extend({
@@ -51,7 +53,7 @@ const App = observer(() => {
   useEffect(() => {
     const loadTexture = async () => {
       try {
-        const loadedTexture = await Assets.load('/test.jpg');
+        const loadedTexture = await Assets.load('/test.png');
         setTexture(loadedTexture);
 
         // 이미지 로드 후 레이아웃 초기화
@@ -983,6 +985,62 @@ const App = observer(() => {
           }}
         >
           뷰 초기화
+        </button>
+        <button
+          onClick={() => {
+            // 절대 좌표로 변환하여 서버에 전송
+            const convertedData = canvasActions.convertToAbsoluteCoordinates();
+            const sessionId = Date.now().toString();
+            sendAbsoluteCoordinatesData(convertedData, sessionId)
+              .then((result) => {
+                if (result?.success) {
+                  alert('절대 좌표 데이터가 서버에 성공적으로 전송되었습니다.');
+                } else {
+                  alert(
+                    `서버 전송 실패: ${result?.error || '알 수 없는 오류'}`
+                  );
+                }
+              })
+              .catch((error) => {
+                console.error('절대 좌표 전송 오류:', error);
+                alert('절대 좌표 전송 중 오류가 발생했습니다.');
+              });
+          }}
+          style={{
+            background: '#6f42c1',
+            color: 'white',
+            border: 'none',
+            padding: '8px 16px',
+            borderRadius: '3px',
+            cursor: 'pointer',
+          }}
+        >
+          절대좌표 서버전송
+        </button>
+        <button
+          onClick={() => {
+            // 절대 좌표로 변환하여 JSON 다운로드
+            const convertedData = canvasActions.convertToAbsoluteCoordinates();
+            const currentDate = new Date();
+            const timestamp = currentDate
+              .toISOString()
+              .replace(/[:.]/g, '-')
+              .split('T')[0];
+            downloadAbsoluteCoordinatesJson(
+              convertedData,
+              `absolute_coordinates_${timestamp}`
+            );
+          }}
+          style={{
+            background: '#e83e8c',
+            color: 'white',
+            border: 'none',
+            padding: '8px 16px',
+            borderRadius: '3px',
+            cursor: 'pointer',
+          }}
+        >
+          절대좌표 JSON 다운로드
         </button>
         <div style={{ color: 'white', alignSelf: 'center' }}>
           사각형: {rectangles.length}개 | 폴리곤: {polygons.length}개

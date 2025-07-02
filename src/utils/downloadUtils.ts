@@ -297,3 +297,87 @@ export const sendApiData = async (
     console.error('API 전송 중 오류 발생:', error);
   }
 };
+
+// 절대 좌표로 변환하여 서버에 전송하는 함수
+export const sendAbsoluteCoordinatesData = async (
+  convertedData: ReturnType<
+    typeof import('../store/canvasStore').canvasActions.convertToAbsoluteCoordinates
+  >,
+  sessionId?: string
+) => {
+  try {
+    const apiData = {
+      rectangles: convertedData.rectangles,
+      polygons: convertedData.polygons,
+      originalImageSize: convertedData.originalImageSize,
+      metadata: convertedData.metadata,
+      sessionId: sessionId || Date.now().toString(),
+      timestamp: new Date().toISOString(),
+    };
+
+    console.log('절대 좌표 API로 전송할 데이터:', apiData);
+
+    // 실제 API 엔드포인트로 데이터 전송
+    const response = await fetch('/api/save-labels', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(apiData),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        `API 오류: ${response.status} - ${errorData.error || 'Unknown error'}`
+      );
+    }
+
+    const result = await response.json();
+    console.log('절대 좌표 API 응답:', result);
+
+    return {
+      success: true,
+      data: result,
+    };
+  } catch (error) {
+    console.error('절대 좌표 API 전송 중 오류 발생:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : '알 수 없는 오류',
+    };
+  }
+};
+
+// JSON 파일로 절대 좌표 데이터 다운로드하는 함수
+export const downloadAbsoluteCoordinatesJson = (
+  convertedData: ReturnType<
+    typeof import('../store/canvasStore').canvasActions.convertToAbsoluteCoordinates
+  >,
+  filename: string = 'absolute_coordinates'
+) => {
+  try {
+    const jsonData = {
+      ...convertedData,
+      exportedAt: new Date().toISOString(),
+      format: 'absolute_coordinates',
+      description: '이미지 원본 크기 기준 절대 좌표계 라벨 데이터',
+    };
+
+    const dataStr = JSON.stringify(jsonData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(dataBlob);
+    link.download = `${filename}.json`;
+    link.click();
+
+    // 메모리 정리
+    URL.revokeObjectURL(link.href);
+
+    console.log('절대 좌표 JSON 파일 다운로드 완료:', filename);
+  } catch (error) {
+    console.error('절대 좌표 JSON 다운로드 중 오류 발생:', error);
+    alert('절대 좌표 JSON 다운로드 중 오류가 발생했습니다.');
+  }
+};
