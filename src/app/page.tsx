@@ -1,9 +1,3 @@
-import App from '@/components/App';
-
 export default function Home() {
-  return (
-    <div>
-      <App />
-    </div>
-  );
+  return <div>안녕</div>;
 }

@@ -6,6 +6,7 @@ import { useState, useRef, PointerEvent, useEffect } from 'react';
 import { observer } from '@legendapp/state/react';
 import { canvasStore, canvasActions, Rectangle } from '../store/canvasStore';
 import { RectangleRenderer } from './RectangleRenderer';
+import { PolygonRenderer } from './PolygonRenderer';
 import { SelectionHandles, getHandleAtPosition } from './SelectionHandles';
 import { findRectAtPosition } from '../utils/rectUtils';
 
@@ -144,6 +145,17 @@ const App = observer(() => {
         color: '#ff0000',
       };
       canvasActions.startDrawing(newRect);
+    } else if (currentMode === 'polygon') {
+      // 폴리곤 모드
+      const isDrawing = canvasStore.isDrawingPolygon.get();
+
+      if (!isDrawing) {
+        // 새 폴리곤 시작
+        canvasActions.startPolygon(worldPos);
+      } else {
+        // 점 추가
+        canvasActions.addPolygonPoint(worldPos);
+      }
     } else if (currentMode === 'select') {
       // 선택 모드
       const selectedId = canvasStore.selectedRectId.get();
@@ -214,6 +226,9 @@ const App = observer(() => {
         height: worldPos.y - currentDrawingRect.y,
       };
       canvasActions.updateDrawing(updatedRect);
+    } else if (currentMode === 'polygon') {
+      // 폴리곤 호버 효과 업데이트
+      canvasActions.updatePolygonHover(worldPos);
     } else if (currentMode === 'select' && currentIsResizing) {
       // 사각형 리사이즈
       canvasActions.updateResize(worldPos);
@@ -248,14 +263,20 @@ const App = observer(() => {
         canvasActions.setMode('pan');
       } else if (e.key === 'd' || e.key === 'D') {
         canvasActions.setMode('draw');
+      } else if (e.key === 'g' || e.key === 'G') {
+        canvasActions.setMode('polygon');
       } else if (e.key === 's' || e.key === 'S') {
         canvasActions.setMode('select');
       } else if (e.key === 'Escape') {
-        canvasActions.setMode('pan');
         const currentIsDrawing = canvasStore.isDrawing.get();
+        const currentIsDrawingPolygon = canvasStore.isDrawingPolygon.get();
+
         if (currentIsDrawing) {
           canvasActions.finishDrawing();
+        } else if (currentIsDrawingPolygon) {
+          canvasActions.cancelPolygon();
         }
+        canvasActions.setMode('pan');
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         const selectedId = canvasStore.selectedRectId.get();
         if (selectedId) {
@@ -300,6 +321,7 @@ const App = observer(() => {
 
     if (currentIsMoving) return 'move';
     if (currentMode === 'draw') return 'crosshair';
+    if (currentMode === 'polygon') return 'crosshair';
     if (currentMode === 'select') return 'pointer';
     if (currentIsDragging) return 'grabbing';
     return 'grab';
@@ -315,6 +337,12 @@ const App = observer(() => {
   const selectedRect = selectedRectId
     ? rectangles.find((r) => r.id === selectedRectId) || null
     : null;
+
+  // 폴리곤 관련 상태들
+  const polygons = canvasStore.polygons.get();
+  const currentPolygon = canvasStore.currentPolygon.get();
+  const hoveredPointIndex = canvasStore.hoveredPointIndex.get();
+  const currentMousePosition = canvasStore.currentMousePosition.get();
 
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh' }}>
@@ -357,6 +385,19 @@ const App = observer(() => {
           }}
         >
           그리기 (D)
+        </button>
+        <button
+          onClick={() => canvasActions.setMode('polygon')}
+          style={{
+            background: mode === 'polygon' ? '#007bff' : '#333',
+            color: 'white',
+            border: 'none',
+            padding: '8px 16px',
+            borderRadius: '3px',
+            cursor: 'pointer',
+          }}
+        >
+          폴리곤 (G)
         </button>
         <button
           onClick={() => canvasActions.setMode('select')}
@@ -426,6 +467,12 @@ const App = observer(() => {
             <RectangleRenderer
               rectangles={rectangles}
               drawingRect={drawingRect}
+            />
+            <PolygonRenderer
+              polygons={polygons}
+              currentPolygon={currentPolygon}
+              hoveredPointIndex={hoveredPointIndex}
+              currentMousePosition={currentMousePosition}
             />
             <SelectionHandles selectedRect={selectedRect} scale={scale} />
           </pixiContainer>

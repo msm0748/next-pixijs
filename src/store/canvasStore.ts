@@ -20,6 +20,14 @@ export interface Rectangle {
   color?: string;
 }
 
+export interface Polygon {
+  id: string;
+  points: { x: number; y: number }[];
+  isComplete: boolean;
+  label?: string;
+  color?: string;
+}
+
 export interface CanvasState {
   // 뷰포트 상태
   position: { x: number; y: number };
@@ -35,8 +43,16 @@ export interface CanvasState {
   drawingRect: Rectangle | null;
   rectangles: Rectangle[];
 
+  // 폴리곤 상태
+  isDrawingPolygon: boolean;
+  currentPolygon: Polygon | null;
+  polygons: Polygon[];
+  hoveredPointIndex: number | null; // 첫번째 점 호버 효과용
+  currentMousePosition: { x: number; y: number } | null; // 실시간 미리보기용
+
   // 선택 상태
   selectedRectId: string | null;
+  selectedPolygonId: string | null;
   isResizing: boolean;
   resizeHandle: 'nw' | 'ne' | 'sw' | 'se' | 'n' | 'e' | 's' | 'w' | null;
   resizeStartRect: Rectangle | null;
@@ -45,9 +61,10 @@ export interface CanvasState {
   isMoving: boolean;
   moveStartPos: { x: number; y: number } | null;
   moveStartRect: Rectangle | null;
+  moveStartPolygon: Polygon | null;
 
   // 모드
-  mode: 'pan' | 'draw' | 'select'; // 선택 모드 추가
+  mode: 'pan' | 'draw' | 'polygon' | 'select'; // 폴리곤 모드 추가
 }
 
 export const canvasStore = observable<CanvasState>({
@@ -65,8 +82,16 @@ export const canvasStore = observable<CanvasState>({
   drawingRect: null,
   rectangles: [],
 
+  // 폴리곤 상태
+  isDrawingPolygon: false,
+  currentPolygon: null,
+  polygons: [],
+  hoveredPointIndex: null,
+  currentMousePosition: null,
+
   // 선택 상태
   selectedRectId: null,
+  selectedPolygonId: null,
   isResizing: false,
   resizeHandle: null,
   resizeStartRect: null,
@@ -75,6 +100,7 @@ export const canvasStore = observable<CanvasState>({
   isMoving: false,
   moveStartPos: null,
   moveStartRect: null,
+  moveStartPolygon: null,
 
   // 모드
   mode: 'pan',
@@ -108,11 +134,22 @@ export const canvasActions = {
   },
 
   // 그리기 관련
-  setMode: (mode: 'pan' | 'draw' | 'select') => {
+  setMode: (mode: 'pan' | 'draw' | 'polygon' | 'select') => {
     canvasStore.mode.set(mode);
-    // 모드 변경 시 선택 해제
+    // 모드 변경 시 선택 해제 및 진행 중인 작업 취소
     if (mode !== 'select') {
       canvasStore.selectedRectId.set(null);
+      canvasStore.selectedPolygonId.set(null);
+    }
+    if (mode !== 'polygon') {
+      canvasStore.isDrawingPolygon.set(false);
+      canvasStore.currentPolygon.set(null);
+      canvasStore.hoveredPointIndex.set(null);
+      canvasStore.currentMousePosition.set(null);
+    }
+    if (mode !== 'draw') {
+      canvasStore.isDrawing.set(false);
+      canvasStore.drawingRect.set(null);
     }
   },
 
@@ -139,9 +176,93 @@ export const canvasActions = {
     canvasStore.drawingRect.set(null);
   },
 
+  // 폴리곤 관련
+  startPolygon: (point: { x: number; y: number }) => {
+    const newPolygon: Polygon = {
+      id: Date.now().toString(),
+      points: [point],
+      isComplete: false,
+      color: '#ff0000',
+    };
+    canvasStore.isDrawingPolygon.set(true);
+    canvasStore.currentPolygon.set(newPolygon);
+    canvasStore.currentMousePosition.set(point); // 초기 마우스 위치 설정
+  },
+
+  addPolygonPoint: (point: { x: number; y: number }) => {
+    const currentPolygon = canvasStore.currentPolygon.get();
+    if (!currentPolygon) return;
+
+    // 첫 번째 점과의 거리 체크 (완성 조건)
+    const firstPoint = currentPolygon.points[0];
+    const distance = Math.sqrt(
+      Math.pow(point.x - firstPoint.x, 2) + Math.pow(point.y - firstPoint.y, 2)
+    );
+
+    // 거리가 10픽셀 이내면 폴리곤 완성
+    if (distance <= 10 && currentPolygon.points.length >= 3) {
+      const completedPolygon = {
+        ...currentPolygon,
+        isComplete: true,
+      };
+      canvasStore.polygons.push(completedPolygon);
+      canvasStore.isDrawingPolygon.set(false);
+      canvasStore.currentPolygon.set(null);
+      canvasStore.hoveredPointIndex.set(null);
+      canvasStore.currentMousePosition.set(null);
+    } else {
+      // 새 점 추가
+      const updatedPolygon = {
+        ...currentPolygon,
+        points: [...currentPolygon.points, point],
+      };
+      canvasStore.currentPolygon.set(updatedPolygon);
+    }
+  },
+
+  updatePolygonHover: (mousePos: { x: number; y: number }) => {
+    const currentPolygon = canvasStore.currentPolygon.get();
+
+    // 현재 마우스 위치 업데이트 (폴리곤 그리는 중일 때만)
+    if (canvasStore.isDrawingPolygon.get()) {
+      canvasStore.currentMousePosition.set(mousePos);
+    }
+
+    if (!currentPolygon || currentPolygon.points.length < 3) {
+      canvasStore.hoveredPointIndex.set(null);
+      return;
+    }
+
+    // 첫 번째 점과의 거리 체크
+    const firstPoint = currentPolygon.points[0];
+    const distance = Math.sqrt(
+      Math.pow(mousePos.x - firstPoint.x, 2) +
+        Math.pow(mousePos.y - firstPoint.y, 2)
+    );
+
+    if (distance <= 10) {
+      canvasStore.hoveredPointIndex.set(0); // 첫 번째 점 호버
+    } else {
+      canvasStore.hoveredPointIndex.set(null);
+    }
+  },
+
+  cancelPolygon: () => {
+    canvasStore.isDrawingPolygon.set(false);
+    canvasStore.currentPolygon.set(null);
+    canvasStore.hoveredPointIndex.set(null);
+    canvasStore.currentMousePosition.set(null);
+  },
+
   // 선택 관련
   selectRectangle: (id: string | null) => {
     canvasStore.selectedRectId.set(id);
+    canvasStore.selectedPolygonId.set(null); // 다른 도형 선택 해제
+  },
+
+  selectPolygon: (id: string | null) => {
+    canvasStore.selectedPolygonId.set(id);
+    canvasStore.selectedRectId.set(null); // 다른 도형 선택 해제
   },
 
   startResize: (
@@ -231,43 +352,80 @@ export const canvasActions = {
   },
 
   // 이동 관련
-  startMove: (worldPos: { x: number; y: number }, rect: Rectangle) => {
+  startMove: (
+    worldPos: { x: number; y: number },
+    rect?: Rectangle,
+    polygon?: Polygon
+  ) => {
     canvasStore.isMoving.set(true);
     canvasStore.moveStartPos.set(worldPos);
-    canvasStore.moveStartRect.set({ ...rect });
+    if (rect) {
+      canvasStore.moveStartRect.set({ ...rect });
+      canvasStore.moveStartPolygon.set(null);
+    }
+    if (polygon) {
+      canvasStore.moveStartPolygon.set({ ...polygon });
+      canvasStore.moveStartRect.set(null);
+    }
   },
 
   updateMove: (worldPos: { x: number; y: number }) => {
     const startPos = canvasStore.moveStartPos.get();
     const startRect = canvasStore.moveStartRect.get();
-    const selectedId = canvasStore.selectedRectId.get();
+    const startPolygon = canvasStore.moveStartPolygon.get();
+    const selectedRectId = canvasStore.selectedRectId.get();
+    const selectedPolygonId = canvasStore.selectedPolygonId.get();
 
-    if (!startPos || !startRect || !selectedId) return;
-
-    const rectangles = canvasStore.rectangles.get();
-    const rectIndex = rectangles.findIndex((r) => r.id === selectedId);
-    if (rectIndex === -1) return;
+    if (!startPos) return;
 
     // 이동량 계산
     const deltaX = worldPos.x - startPos.x;
     const deltaY = worldPos.y - startPos.y;
 
-    // 새 위치 적용
-    const newRect = {
-      ...startRect,
-      x: startRect.x + deltaX,
-      y: startRect.y + deltaY,
-    };
+    // 사각형 이동
+    if (startRect && selectedRectId) {
+      const rectangles = canvasStore.rectangles.get();
+      const rectIndex = rectangles.findIndex((r) => r.id === selectedRectId);
+      if (rectIndex === -1) return;
 
-    const updatedRectangles = [...rectangles];
-    updatedRectangles[rectIndex] = newRect;
-    canvasStore.rectangles.set(updatedRectangles);
+      const newRect = {
+        ...startRect,
+        x: startRect.x + deltaX,
+        y: startRect.y + deltaY,
+      };
+
+      const updatedRectangles = [...rectangles];
+      updatedRectangles[rectIndex] = newRect;
+      canvasStore.rectangles.set(updatedRectangles);
+    }
+
+    // 폴리곤 이동
+    if (startPolygon && selectedPolygonId) {
+      const polygons = canvasStore.polygons.get();
+      const polygonIndex = polygons.findIndex(
+        (p) => p.id === selectedPolygonId
+      );
+      if (polygonIndex === -1) return;
+
+      const newPolygon = {
+        ...startPolygon,
+        points: startPolygon.points.map((point) => ({
+          x: point.x + deltaX,
+          y: point.y + deltaY,
+        })),
+      };
+
+      const updatedPolygons = [...polygons];
+      updatedPolygons[polygonIndex] = newPolygon;
+      canvasStore.polygons.set(updatedPolygons);
+    }
   },
 
   endMove: () => {
     canvasStore.isMoving.set(false);
     canvasStore.moveStartPos.set(null);
     canvasStore.moveStartRect.set(null);
+    canvasStore.moveStartPolygon.set(null);
   },
 
   removeRectangle: (id: string) => {
@@ -279,8 +437,37 @@ export const canvasActions = {
     }
   },
 
+  removePolygon: (id: string) => {
+    const polygons = canvasStore.polygons.get();
+    canvasStore.polygons.set(polygons.filter((polygon) => polygon.id !== id));
+    // 삭제된 폴리곤이 선택되어 있었다면 선택 해제
+    if (canvasStore.selectedPolygonId.get() === id) {
+      canvasStore.selectedPolygonId.set(null);
+    }
+  },
+
   clearRectangles: () => {
     canvasStore.rectangles.set([]);
     canvasStore.selectedRectId.set(null);
+  },
+
+  clearPolygons: () => {
+    canvasStore.polygons.set([]);
+    canvasStore.selectedPolygonId.set(null);
+    canvasStore.isDrawingPolygon.set(false);
+    canvasStore.currentPolygon.set(null);
+    canvasStore.hoveredPointIndex.set(null);
+    canvasStore.currentMousePosition.set(null);
+  },
+
+  clearAll: () => {
+    canvasStore.rectangles.set([]);
+    canvasStore.polygons.set([]);
+    canvasStore.selectedRectId.set(null);
+    canvasStore.selectedPolygonId.set(null);
+    canvasStore.isDrawingPolygon.set(false);
+    canvasStore.currentPolygon.set(null);
+    canvasStore.hoveredPointIndex.set(null);
+    canvasStore.currentMousePosition.set(null);
   },
 };
