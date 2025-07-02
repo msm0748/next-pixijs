@@ -1,4 +1,4 @@
-import { Application, Graphics, Container } from 'pixi.js';
+import { Application, Graphics, Container, Sprite, Texture } from 'pixi.js';
 import { Rectangle, Polygon } from '../store/canvasStore';
 
 // 색상을 16진수로 변환하는 함수
@@ -173,5 +173,127 @@ export const downloadLabels = async (
   } catch (error) {
     console.error('라벨 다운로드 중 오류 발생:', error);
     alert('라벨 다운로드 중 오류가 발생했습니다.');
+  }
+};
+
+// 이미지와 라벨을 함께 다운로드하는 함수
+export const downloadImageWithLabels = async (
+  rectangles: Rectangle[],
+  polygons: Polygon[],
+  backgroundTexture: Texture,
+  canvasSize: { width: number; height: number },
+  position: { x: number; y: number },
+  scale: number,
+  filename: string = 'image_with_labels'
+) => {
+  try {
+    // 임시 PIXI 애플리케이션 생성
+    const app = new Application();
+    await app.init({
+      width: canvasSize.width,
+      height: canvasSize.height,
+      backgroundColor: 0x000000,
+      antialias: true,
+    });
+
+    // 배경 이미지 스프라이트 생성
+    const backgroundSprite = new Sprite(backgroundTexture);
+    backgroundSprite.anchor.set(0.5);
+    backgroundSprite.x = canvasSize.width / 2;
+    backgroundSprite.y = canvasSize.height / 2;
+
+    // 메인 컨테이너 생성 (변환 적용)
+    const mainContainer = new Container();
+    mainContainer.x = position.x;
+    mainContainer.y = position.y;
+    mainContainer.scale.set(scale);
+
+    // 배경 이미지를 변환된 컨테이너에 추가
+    mainContainer.addChild(backgroundSprite);
+
+    // 라벨을 그릴 그래픽스 객체 생성
+    const graphics = new Graphics();
+    mainContainer.addChild(graphics);
+
+    // 사각형과 폴리곤 그리기
+    drawRectangles(graphics, rectangles);
+    drawPolygons(graphics, polygons);
+
+    // 메인 컨테이너를 앱에 추가
+    app.stage.addChild(mainContainer);
+
+    // 렌더링하고 이미지로 변환
+    app.renderer.render(app.stage);
+    const canvas = app.canvas as HTMLCanvasElement;
+
+    // 이미지 다운로드
+    const link = document.createElement('a');
+    link.download = `${filename}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+
+    // 정리
+    app.destroy(true);
+  } catch (error) {
+    console.error('이미지+라벨 다운로드 중 오류 발생:', error);
+    alert('이미지+라벨 다운로드 중 오류가 발생했습니다.');
+  }
+};
+
+// API 전송을 위한 함수
+export const sendApiData = async (
+  rectangles: Rectangle[],
+  polygons: Polygon[],
+  sessionId?: string
+) => {
+  try {
+    const apiData = {
+      rectangles: rectangles.map((rect) => ({
+        id: rect.id,
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+        label: rect.label,
+        color: rect.color,
+      })),
+      polygons: polygons.map((polygon) => ({
+        id: polygon.id,
+        points: polygon.points,
+        isComplete: polygon.isComplete,
+        label: polygon.label,
+        color: polygon.color,
+      })),
+      sessionId: sessionId || Date.now().toString(),
+      timestamp: new Date().toISOString(),
+    };
+
+    console.log('API로 전송할 데이터:', apiData);
+
+    // 실제 API 엔드포인트로 데이터 전송
+    const response = await fetch('/api/save-labels', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(apiData),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        `API 오류: ${response.status} - ${errorData.error || 'Unknown error'}`
+      );
+    }
+
+    const result = await response.json();
+    console.log('API 응답:', result);
+
+    return {
+      success: true,
+      data: result,
+    };
+  } catch (error) {
+    console.error('API 전송 중 오류 발생:', error);
   }
 };

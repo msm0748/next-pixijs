@@ -4,7 +4,13 @@ import { Application, extend } from '@pixi/react';
 import { Container, Sprite, Graphics, Assets, Texture } from 'pixi.js';
 import { useState, useRef, PointerEvent, useEffect } from 'react';
 import { observer } from '@legendapp/state/react';
-import { canvasStore, canvasActions, Rectangle } from '../store/canvasStore';
+import { usePathname } from 'next/navigation';
+import {
+  canvasStore,
+  canvasActions,
+  Rectangle,
+  Polygon,
+} from '../store/canvasStore';
 import { RectangleRenderer } from './RectangleRenderer';
 import { PolygonRenderer } from './PolygonRenderer';
 import { SelectionHandles, getHandleAtPosition } from './SelectionHandles';
@@ -16,7 +22,11 @@ import {
 import { Crosshair } from './Crosshair';
 import { findRectAtPosition } from '../utils/rectUtils';
 import { findPolygonAtPosition } from '../utils/polygonUtils';
-import { downloadLabels } from '../utils/downloadUtils';
+import {
+  downloadLabels,
+  downloadImageWithLabels,
+  sendApiData,
+} from '../utils/downloadUtils';
 
 extend({
   Container,
@@ -27,6 +37,7 @@ extend({
 const App = observer(() => {
   const [texture, setTexture] = useState<Texture | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
 
   // 텍스처 로드
   useEffect(() => {
@@ -354,6 +365,135 @@ const App = observer(() => {
     e.preventDefault(); // 기본 컨텍스트 메뉴 방지
   };
 
+  // 페이지 벗어날 때 API 호출
+  useEffect(() => {
+    const sessionId = Date.now().toString();
+
+    const saveDataWithBeacon = (
+      rectangles: Rectangle[],
+      polygons: Polygon[]
+    ) => {
+      const apiData = {
+        rectangles: rectangles.map((rect) => ({
+          id: rect.id,
+          x: rect.x,
+          y: rect.y,
+          width: rect.width,
+          height: rect.height,
+          label: rect.label,
+          color: rect.color,
+        })),
+        polygons: polygons.map((polygon) => ({
+          id: polygon.id,
+          points: polygon.points,
+          isComplete: polygon.isComplete,
+          label: polygon.label,
+          color: polygon.color,
+        })),
+        sessionId,
+        timestamp: new Date().toISOString(),
+      };
+
+      // sendBeacon을 사용해서 페이지가 닫혀도 데이터 전송 보장
+      if (navigator.sendBeacon) {
+        const blob = new Blob([JSON.stringify(apiData)], {
+          type: 'application/json',
+        });
+        const sent = navigator.sendBeacon('/api/save-labels', blob);
+        console.log('sendBeacon 전송 결과:', sent);
+        return sent;
+      } else {
+        // sendBeacon이 지원되지 않으면 일반 fetch 사용
+        sendApiData(rectangles, polygons, sessionId);
+        return true;
+      }
+    };
+
+    const handleBeforeUnload = () => {
+      // 라벨이 있을 때만 API 호출
+      const currentRectangles = canvasStore.rectangles.get();
+      const currentPolygons = canvasStore.polygons.get();
+
+      if (currentRectangles.length > 0 || currentPolygons.length > 0) {
+        // sendBeacon으로 확실하게 데이터 전송
+        const sent = saveDataWithBeacon(currentRectangles, currentPolygons);
+
+        if (sent) {
+          console.log('페이지 종료 시 라벨 데이터 자동 저장됨');
+        }
+
+        // 사용자에게 알림 (확인 메시지는 제거하여 자동 저장)
+        // e.preventDefault();
+        // e.returnValue = '작업한 라벨 데이터가 저장됩니다.';
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      // 페이지가 숨겨질 때도 API 호출
+      if (document.visibilityState === 'hidden') {
+        const currentRectangles = canvasStore.rectangles.get();
+        const currentPolygons = canvasStore.polygons.get();
+
+        if (currentRectangles.length > 0 || currentPolygons.length > 0) {
+          saveDataWithBeacon(currentRectangles, currentPolygons);
+          console.log('페이지 숨김 시 라벨 데이터 자동 저장됨');
+        }
+      }
+    };
+
+    // 주기적 자동 저장 (5분마다)
+    const autoSaveInterval = setInterval(() => {
+      const currentRectangles = canvasStore.rectangles.get();
+      const currentPolygons = canvasStore.polygons.get();
+
+      if (currentRectangles.length > 0 || currentPolygons.length > 0) {
+        sendApiData(currentRectangles, currentPolygons, sessionId)
+          .then(() => {
+            console.log('자동 저장 완료 (5분 간격)');
+          })
+          .catch((error) => {
+            console.error('자동 저장 실패:', error);
+          });
+      }
+    }, 5 * 60 * 1000); // 5분
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      console.log('벗어나냐');
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(autoSaveInterval);
+    };
+  }, []);
+
+  // Next.js 라우팅으로 페이지 이동 시 데이터 저장
+  useEffect(() => {
+    const saveOnPageChange = () => {
+      const currentRectangles = canvasStore.rectangles.get();
+      const currentPolygons = canvasStore.polygons.get();
+
+      if (currentRectangles.length > 0 || currentPolygons.length > 0) {
+        const sessionId = Date.now().toString();
+        console.log('Next.js 라우팅 감지 - 데이터 저장 중...');
+        sendApiData(currentRectangles, currentPolygons, sessionId)
+          .then(() => {
+            console.log('페이지 이동 시 라벨 데이터 자동 저장됨');
+          })
+          .catch((error) => {
+            console.error('페이지 이동 시 저장 실패:', error);
+          });
+      }
+    };
+
+    // 컴포넌트가 언마운트될 때 (다른 페이지로 이동 시) 저장
+    return () => {
+      console.log('컴포넌트 언마운트 감지');
+      saveOnPageChange();
+    };
+  }, [pathname]); // pathname이 변경될 때마다 실행
+
   // 키보드 단축키
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -583,6 +723,42 @@ const App = observer(() => {
           }}
         >
           라벨 다운로드
+        </button>
+        <button
+          onClick={() => {
+            if (!texture) {
+              alert('배경 이미지가 로드되지 않았습니다.');
+              return;
+            }
+            const currentDate = new Date();
+            const timestamp = currentDate
+              .toISOString()
+              .replace(/[:.]/g, '-')
+              .split('T')[0];
+            downloadImageWithLabels(
+              rectangles,
+              polygons,
+              texture,
+              {
+                width: typeof window !== 'undefined' ? window.innerWidth : 800,
+                height:
+                  typeof window !== 'undefined' ? window.innerHeight : 600,
+              },
+              position,
+              scale,
+              `image_with_labels_${timestamp}`
+            );
+          }}
+          style={{
+            background: '#007bff',
+            color: 'white',
+            border: 'none',
+            padding: '8px 16px',
+            borderRadius: '3px',
+            cursor: 'pointer',
+          }}
+        >
+          이미지+라벨 다운로드
         </button>
         <div style={{ color: 'white', alignSelf: 'center' }}>
           사각형: {rectangles.length}개 | 폴리곤: {polygons.length}개
