@@ -418,11 +418,15 @@ const App = observer(() => {
       currentIsDrawing &&
       currentDrawingRect
     ) {
-      // 사각형 그리기 (그리는 동안에는 경계 제한하지 않음)
+      // 사각형 그리기 - 마우스 위치를 이미지 경계 내로 제한
+      const clampedPos = canvasActions.clampToImageBounds(
+        worldPos.x,
+        worldPos.y
+      );
       const updatedRect: Rectangle = {
         ...currentDrawingRect,
-        width: worldPos.x - currentDrawingRect.x,
-        height: worldPos.y - currentDrawingRect.y,
+        width: clampedPos.x - currentDrawingRect.x,
+        height: clampedPos.y - currentDrawingRect.y,
       };
       canvasActions.updateDrawing(updatedRect);
     } else if (currentMode === 'polygon') {
