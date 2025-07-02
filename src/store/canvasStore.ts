@@ -282,7 +282,7 @@ export const canvasActions = {
   updatePolygonHover: (mousePos: { x: number; y: number }) => {
     const currentPolygon = canvasStore.currentPolygon.get();
 
-    // 현재 마우스 위치 업데이트 (폴리곤 그리는 중일 때만)
+    // 현재 마우스 위치 업데이트 (폴리곤 그리는 중일 때만) - 경계 제한 없이 자유롭게
     if (canvasStore.isDrawingPolygon.get()) {
       canvasStore.currentMousePosition.set(mousePos);
     }

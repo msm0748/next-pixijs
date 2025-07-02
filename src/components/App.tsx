@@ -430,12 +430,8 @@ const App = observer(() => {
       };
       canvasActions.updateDrawing(updatedRect);
     } else if (currentMode === 'polygon') {
-      // 폴리곤 호버 효과 업데이트
-      const clampedPos = canvasActions.clampToImageBounds(
-        worldPos.x,
-        worldPos.y
-      );
-      canvasActions.updatePolygonHover(clampedPos);
+      // 폴리곤 호버 효과 업데이트 - 경계 제한 없이 자유롭게 이동
+      canvasActions.updatePolygonHover(worldPos);
     } else if (currentMode === 'select' && currentIsResizing) {
       // 사각형 리사이즈
       canvasActions.updateResize(worldPos);
