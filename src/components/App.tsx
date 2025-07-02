@@ -21,6 +21,8 @@ import {
 } from './PolygonSelectionHandles';
 import { Crosshair } from './Crosshair';
 import { BackgroundOverlay } from './BackgroundOverlay';
+import { ImageFilter } from './ImageFilter';
+import { ImageAdjustmentPanel } from './ImageAdjustmentPanel';
 import { findRectAtPosition } from '../utils/rectUtils';
 import { findPolygonAtPosition } from '../utils/polygonUtils';
 import {
@@ -603,8 +605,15 @@ const App = observer(() => {
   // 배경 오버레이 관련 상태
   const showBackgroundOverlay = canvasStore.showBackgroundOverlay.get();
 
+  // 이미지 조정 관련 상태
+  const brightness = canvasStore.brightness.get();
+  const contrast = canvasStore.contrast.get();
+
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh' }}>
+      {/* 이미지 조정 패널 */}
+      <ImageAdjustmentPanel />
+
       {/* 툴바 */}
       <div
         style={{
@@ -812,12 +821,14 @@ const App = observer(() => {
           backgroundAlpha={0}
         >
           <pixiContainer x={position.x} y={position.y} scale={scale}>
-            <pixiSprite
-              texture={texture}
-              anchor={0.5}
-              x={typeof window !== 'undefined' ? window.innerWidth / 2 : 400}
-              y={typeof window !== 'undefined' ? window.innerHeight / 2 : 300}
-            />
+            <ImageFilter brightness={brightness} contrast={contrast}>
+              <pixiSprite
+                texture={texture}
+                anchor={0.5}
+                x={typeof window !== 'undefined' ? window.innerWidth / 2 : 400}
+                y={typeof window !== 'undefined' ? window.innerHeight / 2 : 300}
+              />
+            </ImageFilter>
             <BackgroundOverlay
               rectangles={rectangles}
               polygons={polygons}

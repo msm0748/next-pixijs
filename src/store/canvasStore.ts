@@ -75,6 +75,10 @@ export interface CanvasState {
   // 배경 오버레이 상태
   showBackgroundOverlay: boolean;
 
+  // 이미지 조정 상태
+  brightness: number; // -100 ~ 100
+  contrast: number; // -100 ~ 100
+
   // 모드
   mode: 'pan' | 'draw' | 'polygon' | 'select'; // 폴리곤 모드 추가
 }
@@ -137,6 +141,10 @@ export const canvasStore = observable<CanvasState>({
 
   // 배경 오버레이 상태
   showBackgroundOverlay: false,
+
+  // 이미지 조정 상태
+  brightness: 0, // -100 ~ 100
+  contrast: 0, // -100 ~ 100
 
   // 모드
   mode: 'pan',
@@ -607,5 +615,19 @@ export const canvasActions = {
   // 배경 오버레이 관련
   setBackgroundOverlay: (enabled: boolean) => {
     canvasStore.showBackgroundOverlay.set(enabled);
+  },
+
+  // 이미지 조정 관련
+  setBrightness: (value: number) => {
+    canvasStore.brightness.set(Math.max(-100, Math.min(100, value)));
+  },
+
+  setContrast: (value: number) => {
+    canvasStore.contrast.set(Math.max(-100, Math.min(100, value)));
+  },
+
+  resetImageAdjustments: () => {
+    canvasStore.brightness.set(0);
+    canvasStore.contrast.set(0);
   },
 };

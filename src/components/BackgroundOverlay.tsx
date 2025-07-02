@@ -74,7 +74,7 @@ export const BackgroundOverlay = ({
       // 1. 전체 배경을 어둡게
       graphics.setFillStyle({
         color: 0x000000,
-        alpha: 0.3, // 투명도를 낮춰서 겹침 효과 최소화
+        alpha: 0.8, // 투명도를 낮춰서 겹침 효과 최소화
       });
       graphics.rect(
         worldBounds.x,
