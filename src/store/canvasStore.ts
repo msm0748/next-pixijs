@@ -69,6 +69,7 @@ export interface CanvasState {
 
   // 크로스헤어 상태
   globalMousePosition: { x: number; y: number } | null;
+  screenMousePosition: { x: number; y: number } | null; // 스크린 좌표
   showCrosshair: boolean;
 
   // 배경 오버레이 상태
@@ -142,6 +143,7 @@ export const canvasStore = observable<CanvasState>({
 
   // 크로스헤어 상태
   globalMousePosition: null,
+  screenMousePosition: null,
   showCrosshair: false,
 
   // 배경 오버레이 상태
@@ -638,8 +640,14 @@ export const canvasActions = {
   },
 
   // 크로스헤어 관련
-  updateGlobalMousePosition: (worldPos: { x: number; y: number } | null) => {
+  updateGlobalMousePosition: (
+    worldPos: { x: number; y: number } | null,
+    screenPos?: { x: number; y: number } | null
+  ) => {
     canvasStore.globalMousePosition.set(worldPos);
+    if (screenPos !== undefined) {
+      canvasStore.screenMousePosition.set(screenPos);
+    }
   },
 
   setCrosshairVisible: (visible: boolean) => {

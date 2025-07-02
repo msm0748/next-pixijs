@@ -393,7 +393,10 @@ const App = observer(() => {
 
     // 크로스헤어 위치 업데이트 (전역 좌표계 사용)
     const globalWorldPos = screenToGlobalWorld(e.clientX, e.clientY);
-    canvasActions.updateGlobalMousePosition(globalWorldPos);
+    canvasActions.updateGlobalMousePosition(globalWorldPos, {
+      x: e.clientX,
+      y: e.clientY,
+    });
 
     if (currentMode === 'pan' && currentIsDragging) {
       // 패닝
@@ -675,6 +678,7 @@ const App = observer(() => {
     const currentIsResizing = canvasStore.isResizing.get();
     const currentIsMoving = canvasStore.isMoving.get();
     const resizeHandle = canvasStore.resizeHandle.get();
+    const screenMousePosition = canvasStore.screenMousePosition.get();
 
     if (currentIsResizing && resizeHandle) {
       // 리사이즈 커서
@@ -694,8 +698,60 @@ const App = observer(() => {
     if (currentIsMoving) return 'move';
     if (currentMode === 'draw') return 'crosshair';
     if (currentMode === 'polygon') return 'crosshair';
-    if (currentMode === 'select') return 'pointer';
     if (currentIsDragging) return 'grabbing';
+
+    // 선택 모드에서 호버 상태 체크
+    if (currentMode === 'select' && screenMousePosition) {
+      const worldPos = screenToWorld(
+        screenMousePosition.x,
+        screenMousePosition.y
+      );
+      const selectedRectId = canvasStore.selectedRectId.get();
+      const rectangles = canvasStore.rectangles.get();
+      const polygons = canvasStore.polygons.get();
+      const currentScale = canvasStore.scale.get();
+
+      // 선택된 사각형이 있으면 핸들/변 호버 체크
+      if (selectedRectId) {
+        const selectedRect = rectangles.find((r) => r.id === selectedRectId);
+        if (selectedRect) {
+          const handle = getHandleAtPosition(
+            worldPos,
+            selectedRect,
+            currentScale
+          );
+          if (handle) {
+            // 핸들 호버 시 리사이즈 커서
+            const cursorMap = {
+              nw: 'nw-resize',
+              ne: 'ne-resize',
+              sw: 'sw-resize',
+              se: 'se-resize',
+              n: 'n-resize',
+              s: 's-resize',
+              w: 'w-resize',
+              e: 'e-resize',
+            };
+            return cursorMap[handle];
+          }
+        }
+      }
+
+      // 사각형 위에 호버 시 이동 커서
+      const hoveredRect = findRectAtPosition(worldPos, rectangles);
+      if (hoveredRect) {
+        return 'move';
+      }
+
+      // 폴리곤 위에 호버 시 이동 커서
+      const hoveredPolygon = findPolygonAtPosition(worldPos, polygons);
+      if (hoveredPolygon) {
+        return 'move';
+      }
+
+      return 'pointer';
+    }
+
     return 'grab';
   };
 
@@ -944,7 +1000,7 @@ const App = observer(() => {
         onPointerUp={handlePointerUp}
         onPointerLeave={() => {
           handlePointerUp();
-          canvasActions.updateGlobalMousePosition(null);
+          canvasActions.updateGlobalMousePosition(null, null);
         }}
         onContextMenu={handleContextMenu}
         style={{
