@@ -72,6 +72,9 @@ export interface CanvasState {
   globalMousePosition: { x: number; y: number } | null;
   showCrosshair: boolean;
 
+  // 배경 오버레이 상태
+  showBackgroundOverlay: boolean;
+
   // 모드
   mode: 'pan' | 'draw' | 'polygon' | 'select'; // 폴리곤 모드 추가
 }
@@ -131,6 +134,9 @@ export const canvasStore = observable<CanvasState>({
   // 크로스헤어 상태
   globalMousePosition: null,
   showCrosshair: false,
+
+  // 배경 오버레이 상태
+  showBackgroundOverlay: false,
 
   // 모드
   mode: 'pan',
@@ -596,5 +602,10 @@ export const canvasActions = {
 
   setCrosshairVisible: (visible: boolean) => {
     canvasStore.showCrosshair.set(visible);
+  },
+
+  // 배경 오버레이 관련
+  setBackgroundOverlay: (enabled: boolean) => {
+    canvasStore.showBackgroundOverlay.set(enabled);
   },
 };

@@ -20,6 +20,7 @@ import {
   getPointOnEdge,
 } from './PolygonSelectionHandles';
 import { Crosshair } from './Crosshair';
+import { BackgroundOverlay } from './BackgroundOverlay';
 import { findRectAtPosition } from '../utils/rectUtils';
 import { findPolygonAtPosition } from '../utils/polygonUtils';
 import {
@@ -599,6 +600,9 @@ const App = observer(() => {
   const globalMousePosition = canvasStore.globalMousePosition.get();
   const showCrosshair = canvasStore.showCrosshair.get();
 
+  // 배경 오버레이 관련 상태
+  const showBackgroundOverlay = canvasStore.showBackgroundOverlay.get();
+
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh' }}>
       {/* 툴바 */}
@@ -760,6 +764,21 @@ const App = observer(() => {
         >
           이미지+라벨 다운로드
         </button>
+        <button
+          onClick={() => {
+            canvasActions.setBackgroundOverlay(!showBackgroundOverlay);
+          }}
+          style={{
+            background: showBackgroundOverlay ? '#ffc107' : '#6c757d',
+            color: 'white',
+            border: 'none',
+            padding: '8px 16px',
+            borderRadius: '3px',
+            cursor: 'pointer',
+          }}
+        >
+          {showBackgroundOverlay ? '배경 어둡게 끄기' : '배경 어둡게 켜기'}
+        </button>
         <div style={{ color: 'white', alignSelf: 'center' }}>
           사각형: {rectangles.length}개 | 폴리곤: {polygons.length}개
           {selectedRectId && ' | 사각형 선택됨'}
@@ -798,6 +817,18 @@ const App = observer(() => {
               anchor={0.5}
               x={typeof window !== 'undefined' ? window.innerWidth / 2 : 400}
               y={typeof window !== 'undefined' ? window.innerHeight / 2 : 300}
+            />
+            <BackgroundOverlay
+              rectangles={rectangles}
+              polygons={polygons}
+              canvasSize={{
+                width: typeof window !== 'undefined' ? window.innerWidth : 800,
+                height:
+                  typeof window !== 'undefined' ? window.innerHeight : 600,
+              }}
+              scale={scale}
+              position={position}
+              enabled={showBackgroundOverlay}
             />
             <RectangleRenderer
               rectangles={rectangles}
