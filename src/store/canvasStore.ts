@@ -31,7 +31,6 @@ export interface Polygon {
 export interface CanvasState {
   // 뷰포트 상태
   position: { x: number; y: number };
-  scale: number;
 
   // 드래그 상태
   isDragging: boolean;
@@ -79,6 +78,13 @@ export interface CanvasState {
   brightness: number; // -100 ~ 100
   contrast: number; // -100 ~ 100
 
+  // 이미지 크기 및 위치 상태
+  imageSize: { width: number; height: number }; // 실제 이미지 크기 (캔버스의 75%)
+  imagePosition: { x: number; y: number }; // 이미지의 중앙 위치
+  canvasSize: { width: number; height: number }; // 캔버스 크기
+  originalImageSize: { width: number; height: number }; // 원본 이미지 크기 (비율 유지용)
+  scale: number; // 뷰포트 스케일 (기존 scale과 동일)
+
   // 모드
   mode: 'pan' | 'draw' | 'polygon' | 'select'; // 폴리곤 모드 추가
 }
@@ -98,7 +104,6 @@ const dummyPolygons = Array.from({ length: 2000 }, (_, i) => ({
 export const canvasStore = observable<CanvasState>({
   // 뷰포트 상태
   position: { x: 0, y: 0 },
-  scale: 1,
 
   // 드래그 상태
   isDragging: false,
@@ -146,6 +151,13 @@ export const canvasStore = observable<CanvasState>({
   brightness: 0, // -100 ~ 100
   contrast: 0, // -100 ~ 100
 
+  // 이미지 크기 및 위치 상태
+  imageSize: { width: 1440, height: 810 }, // 실제 이미지 크기 (캔버스의 75%)
+  imagePosition: { x: 960, y: 540 }, // 이미지 중앙 위치 (캔버스 중앙)
+  canvasSize: { width: 1920, height: 1080 }, // 기본 캔버스 크기
+  originalImageSize: { width: 1920, height: 1080 }, // 원본 이미지 크기
+  scale: 1.0, // 뷰포트 스케일
+
   // 모드
   mode: 'pan',
 });
@@ -155,10 +167,6 @@ export const canvasActions = {
   // 뷰포트 관련
   setPosition: (position: { x: number; y: number }) => {
     canvasStore.position.set(position);
-  },
-
-  setScale: (scale: number) => {
-    canvasStore.scale.set(scale);
   },
 
   // 드래그 관련
@@ -629,5 +637,98 @@ export const canvasActions = {
   resetImageAdjustments: () => {
     canvasStore.brightness.set(0);
     canvasStore.contrast.set(0);
+  },
+
+  // 이미지 크기 및 위치 관련
+  setCanvasSize: (size: { width: number; height: number }) => {
+    canvasStore.canvasSize.set(size);
+
+    // 원본 이미지 비율을 유지하면서 캔버스의 75%에 맞추기
+    const originalImageSize = canvasStore.originalImageSize.get();
+    const targetCanvasSize = {
+      width: size.width * 0.75,
+      height: size.height * 0.75,
+    };
+
+    // 원본 이미지 비율 유지하면서 75% 영역에 맞는 크기 계산
+    const scaleX = targetCanvasSize.width / originalImageSize.width;
+    const scaleY = targetCanvasSize.height / originalImageSize.height;
+    const scale = Math.min(scaleX, scaleY); // 비율 유지를 위해 더 작은 스케일 사용
+
+    const imageSize = {
+      width: originalImageSize.width * scale,
+      height: originalImageSize.height * scale,
+    };
+
+    const centerX = size.width / 2;
+    const centerY = size.height / 2;
+
+    canvasStore.imageSize.set(imageSize);
+    canvasStore.imagePosition.set({ x: centerX, y: centerY });
+  },
+
+  setImageSize: (size: { width: number; height: number }) => {
+    canvasStore.imageSize.set(size);
+  },
+
+  setImagePosition: (position: { x: number; y: number }) => {
+    canvasStore.imagePosition.set(position);
+  },
+
+  centerImageInCanvas: () => {
+    const canvasSize = canvasStore.canvasSize.get();
+    const centerX = canvasSize.width / 2;
+    const centerY = canvasSize.height / 2;
+    canvasStore.imagePosition.set({ x: centerX, y: centerY });
+  },
+
+  initializeImageLayout: (
+    canvasSize: { width: number; height: number },
+    originalImageSize?: { width: number; height: number }
+  ) => {
+    // 캔버스 크기 설정
+    canvasStore.canvasSize.set(canvasSize);
+
+    // 원본 이미지 크기 설정 (제공된 경우)
+    if (originalImageSize) {
+      canvasStore.originalImageSize.set(originalImageSize);
+    }
+
+    const currentOriginalImageSize = canvasStore.originalImageSize.get();
+    const targetCanvasSize = {
+      width: canvasSize.width * 0.75,
+      height: canvasSize.height * 0.75,
+    };
+
+    // 원본 이미지 비율 유지하면서 75% 영역에 맞는 크기 계산
+    const scaleX = targetCanvasSize.width / currentOriginalImageSize.width;
+    const scaleY = targetCanvasSize.height / currentOriginalImageSize.height;
+    const scale = Math.min(scaleX, scaleY); // 비율 유지를 위해 더 작은 스케일 사용
+
+    const imageSize = {
+      width: currentOriginalImageSize.width * scale,
+      height: currentOriginalImageSize.height * scale,
+    };
+    canvasStore.imageSize.set(imageSize);
+
+    // 이미지를 캔버스 중앙에 배치
+    const centerX = canvasSize.width / 2;
+    const centerY = canvasSize.height / 2;
+    canvasStore.imagePosition.set({ x: centerX, y: centerY });
+  },
+
+  // 현재 이미지의 실제 렌더링 크기 계산 (이미지 크기 * 뷰포트 스케일)
+  getCurrentImageSize: () => {
+    const imageSize = canvasStore.imageSize.get();
+    const scale = canvasStore.scale.get();
+    return {
+      width: imageSize.width * scale,
+      height: imageSize.height * scale,
+    };
+  },
+
+  // 뷰포트 스케일 관련
+  setViewportScale: (scale: number) => {
+    canvasStore.scale.set(Math.max(0.1, Math.min(5.0, scale)));
   },
 };

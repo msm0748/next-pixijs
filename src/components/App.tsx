@@ -42,18 +42,88 @@ const App = observer(() => {
   const containerRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
 
+  console.log('리렌더링');
   // 텍스처 로드
   useEffect(() => {
     const loadTexture = async () => {
       try {
         const loadedTexture = await Assets.load('/test.jpg');
         setTexture(loadedTexture);
+
+        // 이미지 로드 후 레이아웃 초기화
+        const canvasSize = {
+          width: typeof window !== 'undefined' ? window.innerWidth : 1920,
+          height: typeof window !== 'undefined' ? window.innerHeight : 1080,
+        };
+        const originalImageSize = {
+          width: loadedTexture.width,
+          height: loadedTexture.height,
+        };
+        canvasActions.initializeImageLayout(canvasSize, originalImageSize);
       } catch (error) {
         console.error('텍스처 로드 실패:', error);
       }
     };
     loadTexture();
   }, []);
+
+  // 윈도우 리사이즈 시 레이아웃 업데이트
+  useEffect(() => {
+    const handleResize = () => {
+      if (texture) {
+        const newCanvasSize = {
+          width: window.innerWidth,
+          height: window.innerHeight,
+        };
+
+        // 리사이즈 전 이미지 크기 저장
+        const oldImageSize = canvasStore.imageSize.get();
+
+        // 캔버스 크기 업데이트 (이미지를 75% 크기로 중앙 재배치)
+        canvasActions.setCanvasSize(newCanvasSize);
+
+        // 리사이즈 후 이미지 크기 가져오기
+        const newImageSize = canvasStore.imageSize.get();
+
+        // 이미지 크기 변화 비율 계산
+        const scaleX = newImageSize.width / oldImageSize.width;
+        const scaleY = newImageSize.height / oldImageSize.height;
+
+        // 기존 라벨들 좌표 변환 (이미지 중심 기준 좌표계에서 크기만 변환)
+        const currentRectangles = canvasStore.rectangles.get();
+        const currentPolygons = canvasStore.polygons.get();
+
+        // 사각형 좌표 변환 (이미지 중심 기준이므로 위치 변화는 없고 크기만 변환)
+        const updatedRectangles = currentRectangles.map((rect) => ({
+          ...rect,
+          x: rect.x * scaleX,
+          y: rect.y * scaleY,
+          width: rect.width * scaleX,
+          height: rect.height * scaleY,
+        }));
+
+        // 폴리곤 좌표 변환 (이미지 중심 기준이므로 위치 변화는 없고 크기만 변환)
+        const updatedPolygons = currentPolygons.map((polygon) => ({
+          ...polygon,
+          points: polygon.points.map((point) => ({
+            x: point.x * scaleX,
+            y: point.y * scaleY,
+          })),
+        }));
+
+        // 변환된 라벨들을 스토어에 반영
+        canvasStore.rectangles.set(updatedRectangles);
+        canvasStore.polygons.set(updatedPolygons);
+
+        // 뷰 초기화 (뷰포트 스케일 1.0, 위치 (0, 0)으로 리셋)
+        canvasActions.setViewportScale(1.0);
+        canvasActions.setPosition({ x: 0, y: 0 });
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [texture]);
 
   // 휠 이벤트 핸들러
   const handleWheel = (e: WheelEvent) => {
@@ -97,7 +167,7 @@ const App = observer(() => {
         y: mouseY - (mouseY - currentPosition.y) * (newScale / currentScale),
       };
 
-      canvasActions.setScale(newScale);
+      canvasActions.setViewportScale(newScale);
       canvasActions.setPosition(newPosition);
     } else {
       console.log('이동 모드'); // 디버깅용
@@ -128,20 +198,26 @@ const App = observer(() => {
     }
   }, [texture]); // texture가 로드된 후에 이벤트 등록
 
-  // 월드 좌표로 변환하는 함수
+  // 월드 좌표로 변환하는 함수 (이미지 좌표계 기준)
   const screenToWorld = (screenX: number, screenY: number) => {
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return { x: 0, y: 0 };
 
     const currentPosition = canvasStore.position.get();
     const currentScale = canvasStore.scale.get();
+    const imagePosition = canvasStore.imagePosition.get();
 
     const localX = screenX - rect.left;
     const localY = screenY - rect.top;
 
+    // 뷰포트 좌표를 이미지 중심 기준 좌표로 변환
+    const worldX = (localX - currentPosition.x) / currentScale;
+    const worldY = (localY - currentPosition.y) / currentScale;
+
+    // 이미지 중심을 원점으로 하는 좌표계로 변환
     return {
-      x: (localX - currentPosition.x) / currentScale,
-      y: (localY - currentPosition.y) / currentScale,
+      x: worldX - imagePosition.x,
+      y: worldY - imagePosition.y,
     };
   };
 
@@ -609,6 +685,10 @@ const App = observer(() => {
   const brightness = canvasStore.brightness.get();
   const contrast = canvasStore.contrast.get();
 
+  // 이미지 크기 및 위치 상태
+  const imageSize = canvasStore.imageSize.get();
+  const imagePosition = canvasStore.imagePosition.get();
+
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh' }}>
       {/* 이미지 조정 패널 */}
@@ -788,6 +868,24 @@ const App = observer(() => {
         >
           {showBackgroundOverlay ? '배경 어둡게 끄기' : '배경 어둡게 켜기'}
         </button>
+        <button
+          onClick={() => {
+            // 뷰포트 스케일을 1.0으로 리셋
+            canvasActions.setViewportScale(1.0);
+            // 뷰포트 위치를 (0, 0)으로 리셋
+            canvasActions.setPosition({ x: 0, y: 0 });
+          }}
+          style={{
+            background: '#17a2b8',
+            color: 'white',
+            border: 'none',
+            padding: '8px 16px',
+            borderRadius: '3px',
+            cursor: 'pointer',
+          }}
+        >
+          뷰 초기화
+        </button>
         <div style={{ color: 'white', alignSelf: 'center' }}>
           사각형: {rectangles.length}개 | 폴리곤: {polygons.length}개
           {selectedRectId && ' | 사각형 선택됨'}
@@ -825,8 +923,10 @@ const App = observer(() => {
               <pixiSprite
                 texture={texture}
                 anchor={0.5}
-                x={typeof window !== 'undefined' ? window.innerWidth / 2 : 400}
-                y={typeof window !== 'undefined' ? window.innerHeight / 2 : 300}
+                x={imagePosition.x}
+                y={imagePosition.y}
+                width={imageSize.width}
+                height={imageSize.height}
               />
             </ImageFilter>
             <BackgroundOverlay
@@ -841,21 +941,24 @@ const App = observer(() => {
               position={position}
               enabled={showBackgroundOverlay}
             />
-            <RectangleRenderer
-              rectangles={rectangles}
-              drawingRect={drawingRect}
-            />
-            <PolygonRenderer
-              polygons={polygons}
-              currentPolygon={currentPolygon}
-              hoveredPointIndex={hoveredPointIndex}
-              currentMousePosition={currentMousePosition}
-            />
-            <SelectionHandles selectedRect={selectedRect} scale={scale} />
-            <PolygonSelectionHandles
-              selectedPolygon={selectedPolygon}
-              scale={scale}
-            />
+            {/* 라벨들을 이미지 중심 기준으로 렌더링 */}
+            <pixiContainer x={imagePosition.x} y={imagePosition.y}>
+              <RectangleRenderer
+                rectangles={rectangles}
+                drawingRect={drawingRect}
+              />
+              <PolygonRenderer
+                polygons={polygons}
+                currentPolygon={currentPolygon}
+                hoveredPointIndex={hoveredPointIndex}
+                currentMousePosition={currentMousePosition}
+              />
+              <SelectionHandles selectedRect={selectedRect} scale={scale} />
+              <PolygonSelectionHandles
+                selectedPolygon={selectedPolygon}
+                scale={scale}
+              />
+            </pixiContainer>
             <Crosshair
               mousePosition={globalMousePosition}
               scale={scale}
