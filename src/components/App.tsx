@@ -39,6 +39,10 @@ extend({
 
 const App = observer(() => {
   const [texture, setTexture] = useState<Texture | null>(null);
+  const [canvasSize, setCanvasSize] = useState({
+    width: typeof window !== 'undefined' ? window.innerWidth : 800,
+    height: typeof window !== 'undefined' ? window.innerHeight : 600,
+  });
   const containerRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
 
@@ -75,6 +79,9 @@ const App = observer(() => {
           width: window.innerWidth,
           height: window.innerHeight,
         };
+
+        // 캔버스 크기 상태 업데이트
+        setCanvasSize(newCanvasSize);
 
         // 리사이즈 전 이미지 크기 저장
         const oldImageSize = canvasStore.imageSize.get();
@@ -221,6 +228,24 @@ const App = observer(() => {
     };
   };
 
+  // 전역 월드 좌표로 변환하는 함수 (Crosshair용)
+  const screenToGlobalWorld = (screenX: number, screenY: number) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 0, y: 0 };
+
+    const currentPosition = canvasStore.position.get();
+    const currentScale = canvasStore.scale.get();
+
+    const localX = screenX - rect.left;
+    const localY = screenY - rect.top;
+
+    // 뷰포트 좌표를 전역 월드 좌표로 변환
+    return {
+      x: (localX - currentPosition.x) / currentScale,
+      y: (localY - currentPosition.y) / currentScale,
+    };
+  };
+
   const handlePointerDown = (e: PointerEvent) => {
     const currentMode = canvasStore.mode.get();
     const currentPosition = canvasStore.position.get();
@@ -354,8 +379,9 @@ const App = observer(() => {
     const currentIsMoving = canvasStore.isMoving.get();
     const worldPos = screenToWorld(e.clientX, e.clientY);
 
-    // 크로스헤어 위치 업데이트
-    canvasActions.updateGlobalMousePosition(worldPos);
+    // 크로스헤어 위치 업데이트 (전역 좌표계 사용)
+    const globalWorldPos = screenToGlobalWorld(e.clientX, e.clientY);
+    canvasActions.updateGlobalMousePosition(globalWorldPos);
 
     if (currentMode === 'pan' && currentIsDragging) {
       // 패닝
@@ -832,11 +858,7 @@ const App = observer(() => {
               rectangles,
               polygons,
               texture,
-              {
-                width: typeof window !== 'undefined' ? window.innerWidth : 800,
-                height:
-                  typeof window !== 'undefined' ? window.innerHeight : 600,
-              },
+              canvasSize,
               position,
               scale,
               `image_with_labels_${timestamp}`
@@ -933,11 +955,7 @@ const App = observer(() => {
             <BackgroundOverlay
               rectangles={rectangles}
               polygons={polygons}
-              canvasSize={{
-                width: typeof window !== 'undefined' ? window.innerWidth : 800,
-                height:
-                  typeof window !== 'undefined' ? window.innerHeight : 600,
-              }}
+              canvasSize={canvasSize}
               scale={scale}
               position={position}
               enabled={showBackgroundOverlay}
@@ -964,11 +982,7 @@ const App = observer(() => {
               mousePosition={globalMousePosition}
               scale={scale}
               position={position}
-              canvasSize={{
-                width: typeof window !== 'undefined' ? window.innerWidth : 800,
-                height:
-                  typeof window !== 'undefined' ? window.innerHeight : 600,
-              }}
+              canvasSize={canvasSize}
               visible={showCrosshair}
             />
           </pixiContainer>
