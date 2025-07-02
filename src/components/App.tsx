@@ -259,10 +259,14 @@ const App = observer(() => {
       );
     } else if (currentMode === 'draw') {
       // 그리기 모드
+      const clampedPos = canvasActions.clampToImageBounds(
+        worldPos.x,
+        worldPos.y
+      );
       const newRect: Rectangle = {
         id: `rect-${Date.now()}`,
-        x: worldPos.x,
-        y: worldPos.y,
+        x: clampedPos.x,
+        y: clampedPos.y,
         width: 0,
         height: 0,
         color: '#ff0000',
@@ -274,10 +278,18 @@ const App = observer(() => {
 
       if (!isDrawing) {
         // 새 폴리곤 시작
-        canvasActions.startPolygon(worldPos);
+        const clampedPos = canvasActions.clampToImageBounds(
+          worldPos.x,
+          worldPos.y
+        );
+        canvasActions.startPolygon(clampedPos);
       } else {
         // 점 추가
-        canvasActions.addPolygonPoint(worldPos);
+        const clampedPos = canvasActions.clampToImageBounds(
+          worldPos.x,
+          worldPos.y
+        );
+        canvasActions.addPolygonPoint(clampedPos);
       }
     } else if (currentMode === 'select') {
       // 선택 모드
@@ -401,7 +413,7 @@ const App = observer(() => {
       currentIsDrawing &&
       currentDrawingRect
     ) {
-      // 사각형 그리기
+      // 사각형 그리기 (그리는 동안에는 경계 제한하지 않음)
       const updatedRect: Rectangle = {
         ...currentDrawingRect,
         width: worldPos.x - currentDrawingRect.x,
@@ -410,7 +422,11 @@ const App = observer(() => {
       canvasActions.updateDrawing(updatedRect);
     } else if (currentMode === 'polygon') {
       // 폴리곤 호버 효과 업데이트
-      canvasActions.updatePolygonHover(worldPos);
+      const clampedPos = canvasActions.clampToImageBounds(
+        worldPos.x,
+        worldPos.y
+      );
+      canvasActions.updatePolygonHover(clampedPos);
     } else if (currentMode === 'select' && currentIsResizing) {
       // 사각형 리사이즈
       canvasActions.updateResize(worldPos);
@@ -419,7 +435,11 @@ const App = observer(() => {
       canvasActions.updateMove(worldPos);
     } else if (currentMode === 'select' && canvasStore.isEditingPolygon.get()) {
       // 폴리곤 점 편집
-      canvasActions.updateEditPolygonPoint(worldPos);
+      const clampedPos = canvasActions.clampToImageBounds(
+        worldPos.x,
+        worldPos.y
+      );
+      canvasActions.updateEditPolygonPoint(clampedPos);
     }
   };
 

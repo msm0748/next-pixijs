@@ -221,8 +221,10 @@ export const canvasActions = {
       Math.abs(drawingRect.width) > 5 &&
       Math.abs(drawingRect.height) > 5
     ) {
-      // 최소 크기 이상일 때만 추가
-      canvasStore.rectangles.push(drawingRect);
+      // 최소 크기 이상일 때만 추가하고 경계 제한 적용
+      const clampedRect =
+        canvasActions.clampRectangleToImageBounds(drawingRect);
+      canvasStore.rectangles.push(clampedRect);
     }
     canvasStore.isDrawing.set(false);
     canvasStore.drawingRect.set(null);
@@ -257,7 +259,10 @@ export const canvasActions = {
         ...currentPolygon,
         isComplete: true,
       };
-      canvasStore.polygons.push(completedPolygon);
+      // 폴리곤 완성 시 경계 제한 적용
+      const clampedPolygon =
+        canvasActions.clampPolygonToImageBounds(completedPolygon);
+      canvasStore.polygons.push(clampedPolygon);
       canvasStore.isDrawingPolygon.set(false);
       canvasStore.currentPolygon.set(null);
       canvasStore.hoveredPointIndex.set(null);
@@ -392,8 +397,11 @@ export const canvasActions = {
     if (Math.abs(newRect.width) < 10) return;
     if (Math.abs(newRect.height) < 10) return;
 
+    // 이미지 경계 내로 제한
+    const clampedRect = canvasActions.clampRectangleToImageBounds(newRect);
+
     const updatedRectangles = [...rectangles];
-    updatedRectangles[rectIndex] = newRect;
+    updatedRectangles[rectIndex] = clampedRect;
     canvasStore.rectangles.set(updatedRectangles);
   },
 
@@ -446,8 +454,12 @@ export const canvasActions = {
         y: startRect.y + deltaY,
       };
 
+      // 이동 시에는 위치만 제한 (크기 유지)
+      const clampedRect =
+        canvasActions.clampRectanglePositionToImageBounds(newRect);
+
       const updatedRectangles = [...rectangles];
-      updatedRectangles[rectIndex] = newRect;
+      updatedRectangles[rectIndex] = clampedRect;
       canvasStore.rectangles.set(updatedRectangles);
     }
 
@@ -467,8 +479,12 @@ export const canvasActions = {
         })),
       };
 
+      // 이동 시에는 전체 이동량만 제한 (크기 유지)
+      const clampedPolygon =
+        canvasActions.clampPolygonPositionToImageBounds(newPolygon);
+
       const updatedPolygons = [...polygons];
-      updatedPolygons[polygonIndex] = newPolygon;
+      updatedPolygons[polygonIndex] = clampedPolygon;
       canvasStore.polygons.set(updatedPolygons);
     }
   },
@@ -504,10 +520,15 @@ export const canvasActions = {
     const updatedPoints = [...updatedPolygons[polygonIndex].points];
     updatedPoints[pointIndex] = worldPos;
 
-    updatedPolygons[polygonIndex] = {
+    const updatedPolygon = {
       ...updatedPolygons[polygonIndex],
       points: updatedPoints,
     };
+
+    // 이미지 경계 내로 제한
+    const clampedPolygon =
+      canvasActions.clampPolygonToImageBounds(updatedPolygon);
+    updatedPolygons[polygonIndex] = clampedPolygon;
 
     canvasStore.polygons.set(updatedPolygons);
   },
@@ -535,10 +556,15 @@ export const canvasActions = {
     // edgeIndex 다음 위치에 새 점 삽입
     updatedPoints.splice(edgeIndex + 1, 0, position);
 
-    updatedPolygons[polygonIndex] = {
+    const updatedPolygon = {
       ...updatedPolygons[polygonIndex],
       points: updatedPoints,
     };
+
+    // 이미지 경계 내로 제한
+    const clampedPolygon =
+      canvasActions.clampPolygonToImageBounds(updatedPolygon);
+    updatedPolygons[polygonIndex] = clampedPolygon;
 
     canvasStore.polygons.set(updatedPolygons);
   },
@@ -730,5 +756,163 @@ export const canvasActions = {
   // 뷰포트 스케일 관련
   setViewportScale: (scale: number) => {
     canvasStore.scale.set(Math.max(0.1, Math.min(5.0, scale)));
+  },
+
+  // 이미지 경계 내로 좌표를 제한하는 함수
+  clampToImageBounds: (x: number, y: number) => {
+    const imageSize = canvasStore.imageSize.get();
+    const halfWidth = imageSize.width / 2;
+    const halfHeight = imageSize.height / 2;
+
+    return {
+      x: Math.max(-halfWidth, Math.min(halfWidth, x)),
+      y: Math.max(-halfHeight, Math.min(halfHeight, y)),
+    };
+  },
+
+  // 사각형을 이미지 경계 내로 제한하는 함수
+  clampRectangleToImageBounds: (rect: Rectangle): Rectangle => {
+    const imageSize = canvasStore.imageSize.get();
+    const halfWidth = imageSize.width / 2;
+    const halfHeight = imageSize.height / 2;
+
+    // 사각형의 실제 경계 계산 (음수 크기 고려)
+    const left = rect.width >= 0 ? rect.x : rect.x + rect.width;
+    const right = rect.width >= 0 ? rect.x + rect.width : rect.x;
+    const top = rect.height >= 0 ? rect.y : rect.y + rect.height;
+    const bottom = rect.height >= 0 ? rect.y + rect.height : rect.y;
+
+    // 이미지 경계 내로 제한
+    const clampedLeft = Math.max(-halfWidth, Math.min(halfWidth, left));
+    const clampedRight = Math.max(-halfWidth, Math.min(halfWidth, right));
+    const clampedTop = Math.max(-halfHeight, Math.min(halfHeight, top));
+    const clampedBottom = Math.max(-halfHeight, Math.min(halfHeight, bottom));
+
+    // 제한된 좌표로 사각형 재구성
+    return {
+      ...rect,
+      x: clampedLeft,
+      y: clampedTop,
+      width: clampedRight - clampedLeft,
+      height: clampedBottom - clampedTop,
+    };
+  },
+
+  // 폴리곤을 이미지 경계 내로 제한하는 함수
+  clampPolygonToImageBounds: (polygon: Polygon): Polygon => {
+    const imageSize = canvasStore.imageSize.get();
+    const halfWidth = imageSize.width / 2;
+    const halfHeight = imageSize.height / 2;
+
+    return {
+      ...polygon,
+      points: polygon.points.map((point) => ({
+        x: Math.max(-halfWidth, Math.min(halfWidth, point.x)),
+        y: Math.max(-halfHeight, Math.min(halfHeight, point.y)),
+      })),
+    };
+  },
+
+  // 사각형 이동 시 위치만 제한하는 함수 (크기 유지)
+  clampRectanglePositionToImageBounds: (rect: Rectangle): Rectangle => {
+    const imageSize = canvasStore.imageSize.get();
+    const halfWidth = imageSize.width / 2;
+    const halfHeight = imageSize.height / 2;
+
+    // 사각형의 실제 경계 계산 (음수 크기 고려)
+    const rectLeft = rect.width >= 0 ? rect.x : rect.x + rect.width;
+    const rectRight = rect.width >= 0 ? rect.x + rect.width : rect.x;
+    const rectTop = rect.height >= 0 ? rect.y : rect.y + rect.height;
+    const rectBottom = rect.height >= 0 ? rect.y + rect.height : rect.y;
+
+    const rectWidth = Math.abs(rect.width);
+    const rectHeight = Math.abs(rect.height);
+
+    // 사각형이 이미지보다 큰 경우 중앙에 배치
+    if (rectWidth > imageSize.width || rectHeight > imageSize.height) {
+      return {
+        ...rect,
+        x: rect.width >= 0 ? -rectWidth / 2 : rectWidth / 2,
+        y: rect.height >= 0 ? -rectHeight / 2 : rectHeight / 2,
+      };
+    }
+
+    // 사각형 위치 제한 (크기 유지)
+    let newX = rect.x;
+    let newY = rect.y;
+
+    // 왼쪽 경계 체크
+    if (rectLeft < -halfWidth) {
+      newX = rect.width >= 0 ? -halfWidth : -halfWidth - rect.width;
+    }
+    // 오른쪽 경계 체크
+    else if (rectRight > halfWidth) {
+      newX = rect.width >= 0 ? halfWidth - rect.width : halfWidth;
+    }
+
+    // 위쪽 경계 체크
+    if (rectTop < -halfHeight) {
+      newY = rect.height >= 0 ? -halfHeight : -halfHeight - rect.height;
+    }
+    // 아래쪽 경계 체크
+    else if (rectBottom > halfHeight) {
+      newY = rect.height >= 0 ? halfHeight - rect.height : halfHeight;
+    }
+
+    return {
+      ...rect,
+      x: newX,
+      y: newY,
+    };
+  },
+
+  // 폴리곤 이동 시 전체 이동량 제한하는 함수
+  clampPolygonPositionToImageBounds: (polygon: Polygon): Polygon => {
+    const imageSize = canvasStore.imageSize.get();
+    const halfWidth = imageSize.width / 2;
+    const halfHeight = imageSize.height / 2;
+
+    // 폴리곤의 경계 박스 계산
+    const xs = polygon.points.map((p) => p.x);
+    const ys = polygon.points.map((p) => p.y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+
+    // 폴리곤이 이미지보다 큰 경우 개별 점 제한
+    if (maxX - minX > imageSize.width || maxY - minY > imageSize.height) {
+      return {
+        ...polygon,
+        points: polygon.points.map((point) => ({
+          x: Math.max(-halfWidth, Math.min(halfWidth, point.x)),
+          y: Math.max(-halfHeight, Math.min(halfHeight, point.y)),
+        })),
+      };
+    }
+
+    // 폴리곤 전체 이동 제한
+    let deltaX = 0;
+    let deltaY = 0;
+
+    if (minX < -halfWidth) {
+      deltaX = -halfWidth - minX;
+    } else if (maxX > halfWidth) {
+      deltaX = halfWidth - maxX;
+    }
+
+    if (minY < -halfHeight) {
+      deltaY = -halfHeight - minY;
+    } else if (maxY > halfHeight) {
+      deltaY = halfHeight - maxY;
+    }
+
+    return {
+      ...polygon,
+      points: polygon.points.map((point) => ({
+        x: point.x + deltaX,
+        y: point.y + deltaY,
+      })),
+    };
   },
 };
