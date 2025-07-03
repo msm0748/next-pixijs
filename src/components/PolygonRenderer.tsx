@@ -3,6 +3,7 @@
 import { Graphics } from 'pixi.js';
 import { useCallback } from 'react';
 import { Polygon } from '../store/canvasStore';
+import { colorToHex } from '@/utils/colorUtils';
 
 interface PolygonRendererProps {
   polygons: Polygon[];
@@ -10,14 +11,6 @@ interface PolygonRendererProps {
   hoveredPointIndex: number | null;
   currentMousePosition: { x: number; y: number } | null;
 }
-
-const colorToHex = (color?: string) => {
-  if (!color) return 0xff0000;
-  if (color.startsWith('#')) {
-    return parseInt(color.slice(1), 16);
-  }
-  return 0xff0000;
-};
 
 export const PolygonRenderer = ({
   polygons,

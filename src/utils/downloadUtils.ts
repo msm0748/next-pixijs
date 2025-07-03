@@ -1,15 +1,7 @@
 import { Application, Graphics, Container, Sprite, Texture } from 'pixi.js';
 import { Rectangle, Polygon } from '../store/canvasStore';
 import { normalizeRect } from './rectUtils';
-
-// 색상을 16진수로 변환하는 함수
-const colorToHex = (color?: string) => {
-  if (!color) return 0x000000;
-  if (color.startsWith('#')) {
-    return parseInt(color.slice(1), 16);
-  }
-  return 0x000000;
-};
+import { colorToHex } from './colorUtils';
 
 // 사각형들을 그리는 함수
 const drawRectangles = (graphics: Graphics, rectangles: Rectangle[]) => {

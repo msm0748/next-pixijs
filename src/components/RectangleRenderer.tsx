@@ -1,6 +1,7 @@
 'use client';
 
 import { Rectangle } from '@/store/canvasStore';
+import { colorToHex } from '@/utils/colorUtils';
 import { normalizeRect } from '@/utils/rectUtils';
 import { Graphics } from 'pixi.js';
 import { useCallback } from 'react';
@@ -9,15 +10,6 @@ interface RectangleRendererProps {
   rectangles: Rectangle[];
   drawingRect: Rectangle | null;
 }
-
-// 색상 문자열을 hex 숫자로 변환하는 함수
-const colorToHex = (color: string | undefined): number => {
-  if (!color) return 0xff0000;
-  if (color.startsWith('#')) {
-    return parseInt(color.slice(1), 16);
-  }
-  return parseInt(color, 16);
-};
 
 export const RectangleRenderer = ({
   rectangles,
