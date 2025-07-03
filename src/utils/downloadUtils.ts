@@ -1,5 +1,6 @@
 import { Application, Graphics, Container, Sprite, Texture } from 'pixi.js';
 import { Rectangle, Polygon } from '../store/canvasStore';
+import { normalizeRect } from './rectUtils';
 
 // 색상을 16진수로 변환하는 함수
 const colorToHex = (color?: string) => {
@@ -8,15 +9,6 @@ const colorToHex = (color?: string) => {
     return parseInt(color.slice(1), 16);
   }
   return 0x000000;
-};
-
-// 사각형을 정규화하는 함수
-const normalizeRect = (rect: Rectangle) => {
-  const x = rect.width < 0 ? rect.x + rect.width : rect.x;
-  const y = rect.height < 0 ? rect.y + rect.height : rect.y;
-  const width = Math.abs(rect.width);
-  const height = Math.abs(rect.height);
-  return { x, y, width, height };
 };
 
 // 사각형들을 그리는 함수

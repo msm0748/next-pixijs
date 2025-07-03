@@ -53,7 +53,7 @@ const App = observer(() => {
   useEffect(() => {
     const loadTexture = async () => {
       try {
-        const loadedTexture = await Assets.load('/test.png');
+        const loadedTexture = await Assets.load('/test.jpg');
         setTexture(loadedTexture);
 
         // 이미지 로드 후 레이아웃 초기화

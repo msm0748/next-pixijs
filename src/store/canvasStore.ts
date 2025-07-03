@@ -1,14 +1,5 @@
+import { normalizeRect } from '@/utils/rectUtils';
 import { observable } from '@legendapp/state';
-
-// 사각형 좌표를 정규화하는 함수
-const normalizeRect = (rect: Rectangle) => {
-  const x = rect.width < 0 ? rect.x + rect.width : rect.x;
-  const y = rect.height < 0 ? rect.y + rect.height : rect.y;
-  const width = Math.abs(rect.width);
-  const height = Math.abs(rect.height);
-
-  return { x, y, width, height };
-};
 
 export interface Rectangle {
   id: string;

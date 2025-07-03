@@ -1,6 +1,7 @@
 'use client';
 
 import { Rectangle } from '@/store/canvasStore';
+import { normalizeRect } from '@/utils/rectUtils';
 import { Graphics } from 'pixi.js';
 import { useCallback } from 'react';
 
@@ -16,16 +17,6 @@ const colorToHex = (color: string | undefined): number => {
     return parseInt(color.slice(1), 16);
   }
   return parseInt(color, 16);
-};
-
-// 사각형 좌표를 정규화하는 함수 (음수 크기 처리)
-const normalizeRect = (rect: Rectangle) => {
-  const x = rect.width < 0 ? rect.x + rect.width : rect.x;
-  const y = rect.height < 0 ? rect.y + rect.height : rect.y;
-  const width = Math.abs(rect.width);
-  const height = Math.abs(rect.height);
-
-  return { x, y, width, height };
 };
 
 export const RectangleRenderer = ({
