@@ -32,6 +32,7 @@ import {
   sendAbsoluteCoordinatesData,
   downloadAbsoluteCoordinatesJson,
 } from '../utils/downloadUtils';
+import { debounce } from 'lodash';
 
 extend({
   Container,
@@ -73,9 +74,9 @@ const App = observer(() => {
     loadTexture();
   }, []);
 
-  // 윈도우 리사이즈 시 레이아웃 업데이트
+  // 윈도우 리사이즈 시 레이아웃 업데이트 (lodash debounce 사용)
   useEffect(() => {
-    const handleResize = () => {
+    const handleResize = debounce(() => {
       if (texture) {
         const newCanvasSize = {
           width: window.innerWidth,
@@ -128,10 +129,14 @@ const App = observer(() => {
         canvasActions.setViewportScale(1.0);
         canvasActions.setPosition({ x: 0, y: 0 });
       }
-    };
+    }, 300); // 300ms 디바운스
 
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      // 컴포넌트 언마운트 시 디바운스 함수 취소
+      handleResize.cancel();
+    };
   }, [texture]);
 
   // 휠 이벤트 핸들러
