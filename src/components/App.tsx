@@ -849,6 +849,18 @@ const App = observer(() => {
         >
           그리기 (D)
         </button>
+        <div
+          style={{
+            color: 'white',
+          }}
+        >
+          {(
+            ((imageSize.width * scale) /
+              canvasStore.originalImageSize.get().width) *
+            100
+          ).toFixed(1)}
+          %
+        </div>
         <button
           onClick={() => {
             canvasActions.setMode('polygon');
