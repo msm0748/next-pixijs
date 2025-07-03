@@ -13,18 +13,19 @@ import {
 } from '../store/canvasStore';
 import { RectangleRenderer } from './RectangleRenderer';
 import { PolygonRenderer } from './PolygonRenderer';
-import { SelectionHandles, getHandleAtPosition } from './SelectionHandles';
-import {
-  PolygonSelectionHandles,
-  getPointHandleAtPosition,
-  getPointOnEdge,
-} from './PolygonSelectionHandles';
+import { SelectionHandles } from './SelectionHandles';
+import { PolygonSelectionHandles } from './PolygonSelectionHandles';
 import { Crosshair } from './Crosshair';
 import { BackgroundOverlay } from './BackgroundOverlay';
 import { ImageFilter } from './ImageFilter';
 import { ImageAdjustmentPanel } from './ImageAdjustmentPanel';
 import { findRectAtPosition } from '../utils/rectUtils';
-import { findPolygonAtPosition } from '../utils/polygonUtils';
+import {
+  findPolygonAtPosition,
+  getHandleAtPosition,
+  getPointHandleAtPosition,
+  getPointOnEdge,
+} from '../utils/polygonUtils';
 import { sendApiData } from '../utils/downloadUtils';
 import { debounce } from 'lodash';
 import Tools from './Tools';
