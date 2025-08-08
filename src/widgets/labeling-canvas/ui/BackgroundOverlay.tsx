@@ -2,8 +2,11 @@
 
 import { Graphics } from 'pixi.js';
 import { useCallback } from 'react';
-import { Rectangle, Polygon } from '../store/canvasStore';
-import { normalizeRect } from '@/utils/rectUtils';
+import type {
+  CanvasRectangle as Rectangle,
+  CanvasPolygon as Polygon,
+} from '@entities/canvas';
+import { normalizeRect } from '@shared/lib/rect';
 
 interface BackgroundOverlayProps {
   rectangles: Rectangle[];
@@ -25,18 +28,13 @@ export const BackgroundOverlay = ({
   const drawOverlay = useCallback(
     (graphics: Graphics) => {
       graphics.clear();
-
       if (!enabled) return;
-
-      // 전체 캔버스 영역을 월드 좌표로 변환
       const worldBounds = {
-        x: -position.x / scale - 2000, // 여유분 추가
+        x: -position.x / scale - 2000,
         y: -position.y / scale - 2000,
         width: canvasSize.width / scale + 4000,
         height: canvasSize.height / scale + 4000,
       };
-
-      // 모든 라벨링된 영역들을 수집
       const labeledAreas: Array<
         { type: 'rect'; data: Rectangle } | { type: 'polygon'; data: Polygon }
       > = [
@@ -45,13 +43,8 @@ export const BackgroundOverlay = ({
           .filter((p) => p.isComplete && p.points.length >= 3)
           .map((polygon) => ({ type: 'polygon' as const, data: polygon })),
       ];
-
-      // 라벨링된 영역이 없으면 전체를 어둡게
       if (labeledAreas.length === 0) {
-        graphics.setFillStyle({
-          color: 0x000000,
-          alpha: 0.5,
-        });
+        graphics.setFillStyle({ color: 0x000000, alpha: 0.5 });
         graphics.rect(
           worldBounds.x,
           worldBounds.y,
@@ -61,13 +54,7 @@ export const BackgroundOverlay = ({
         graphics.fill();
         return;
       }
-
-      // 복잡한 영역 분할 대신 간단한 오버레이 방식 사용
-      // 1. 전체 배경을 어둡게
-      graphics.setFillStyle({
-        color: 0x000000,
-        alpha: 0.8, // 투명도를 낮춰서 겹침 효과 최소화
-      });
+      graphics.setFillStyle({ color: 0x000000, alpha: 0.8 });
       graphics.rect(
         worldBounds.x,
         worldBounds.y,
@@ -75,14 +62,8 @@ export const BackgroundOverlay = ({
         worldBounds.height
       );
       graphics.fill();
-
-      // 2. 라벨링된 영역들에 밝은 오버레이를 추가하여 원래 밝기에 가깝게 복원
       labeledAreas.forEach((area) => {
-        graphics.setFillStyle({
-          color: 0xffffff,
-          alpha: 0.3, // 어두운 부분을 상쇄할 정도의 밝기
-        });
-
+        graphics.setFillStyle({ color: 0xffffff, alpha: 0.3 });
         if (area.type === 'rect') {
           const normalized = normalizeRect(area.data);
           graphics.rect(

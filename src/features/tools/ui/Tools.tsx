@@ -1,10 +1,9 @@
-import { canvasStore, canvasActions } from '../store/canvasStore';
-
+import { canvasStore, canvasActions } from '@entities/canvas';
 import {
   downloadLabels,
   sendAbsoluteCoordinatesData,
   downloadAbsoluteCoordinatesJson,
-} from '../utils/downloadUtils';
+} from '@shared/api/labels';
 
 export default function Tools() {
   const mode = canvasStore.mode.get();
@@ -61,11 +60,7 @@ export default function Tools() {
       >
         그리기 (D)
       </button>
-      <div
-        style={{
-          color: 'white',
-        }}
-      >
+      <div style={{ color: 'white' }}>
         {(
           ((imageSize.width * scale) /
             canvasStore.originalImageSize.get().width) *
@@ -107,13 +102,12 @@ export default function Tools() {
       </button>
       <button
         onClick={() => {
-          const selectedRectId = canvasStore.selectedRectId.get();
-          const selectedPolygonId = canvasStore.selectedPolygonId.get();
-
-          if (selectedRectId) {
-            canvasActions.removeRectangle(selectedRectId);
-          } else if (selectedPolygonId) {
-            canvasActions.removePolygon(selectedPolygonId);
+          const rId = canvasStore.selectedRectId.get();
+          const pId = canvasStore.selectedPolygonId.get();
+          if (rId) {
+            canvasActions.removeRectangle(rId);
+          } else if (pId) {
+            canvasActions.removePolygon(pId);
           } else {
             canvasActions.clearAll();
           }
@@ -149,7 +143,6 @@ export default function Tools() {
       >
         라벨 다운로드
       </button>
-
       <button
         onClick={() => {
           canvasActions.setBackgroundOverlay(!showBackgroundOverlay);
@@ -167,9 +160,7 @@ export default function Tools() {
       </button>
       <button
         onClick={() => {
-          // 뷰포트 스케일을 1.0으로 리셋
           canvasActions.setViewportScale(1.0);
-          // 뷰포트 위치를 (0, 0)으로 리셋
           canvasActions.setPosition({ x: 0, y: 0 });
         }}
         style={{
@@ -185,7 +176,6 @@ export default function Tools() {
       </button>
       <button
         onClick={() => {
-          // 절대 좌표로 변환하여 서버에 전송
           const convertedData = canvasActions.convertToAbsoluteCoordinates();
           const sessionId = Date.now().toString();
           sendAbsoluteCoordinatesData(convertedData, sessionId)
@@ -214,7 +204,6 @@ export default function Tools() {
       </button>
       <button
         onClick={() => {
-          // 절대 좌표로 변환하여 JSON 다운로드
           const convertedData = canvasActions.convertToAbsoluteCoordinates();
           const currentDate = new Date();
           const timestamp = currentDate

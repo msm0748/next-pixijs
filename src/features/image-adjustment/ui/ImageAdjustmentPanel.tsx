@@ -1,14 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { canvasStore, canvasActions } from '../store/canvasStore';
+import { canvasStore, canvasActions } from '@entities/canvas';
 import { observer } from '@legendapp/state/react';
 
 export const ImageAdjustmentPanel = observer(() => {
   const [isVisible, setIsVisible] = useState(false);
   const brightness = canvasStore.brightness.get();
   const contrast = canvasStore.contrast.get();
-
   return (
     <div
       style={{
@@ -38,10 +37,8 @@ export const ImageAdjustmentPanel = observer(() => {
       >
         {isVisible ? '이미지 조정 숨기기' : '이미지 조정 패널'}
       </button>
-
       {isVisible && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-          {/* 밝기 조절 */}
           <div>
             <label
               style={{
@@ -70,8 +67,6 @@ export const ImageAdjustmentPanel = observer(() => {
               }}
             />
           </div>
-
-          {/* 대비 조절 */}
           <div>
             <label
               style={{
@@ -100,8 +95,6 @@ export const ImageAdjustmentPanel = observer(() => {
               }}
             />
           </div>
-
-          {/* 리셋 버튼 */}
           <button
             onClick={() => canvasActions.resetImageAdjustments()}
             style={{
@@ -121,3 +114,5 @@ export const ImageAdjustmentPanel = observer(() => {
     </div>
   );
 });
+
+export default ImageAdjustmentPanel;

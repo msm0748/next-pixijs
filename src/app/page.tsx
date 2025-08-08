@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import App from '@widgets/labeling-canvas';
 
 export default function Home() {
   return (
@@ -28,6 +29,7 @@ export default function Home() {
           About 페이지로
         </Link>
       </div>
+      <App />
     </div>
   );
 }

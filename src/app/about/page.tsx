@@ -1,4 +1,4 @@
-import App from '@/components/App';
+import App from '@widgets/labeling-canvas';
 import Link from 'next/link';
 
 export default function Page() {

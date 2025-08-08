@@ -1,4 +1,4 @@
-import { Provider } from '@/components/ui/provider';
+import { Provider } from '@shared/ui/provider';
 import { Box } from '@chakra-ui/react';
 import Link from 'next/link';
 
