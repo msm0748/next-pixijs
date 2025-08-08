@@ -1,4 +1,11 @@
-import { Application, Graphics, Container, Sprite, Texture } from 'pixi.js';
+import {
+  Application,
+  Graphics,
+  Container,
+  Sprite,
+  Texture,
+  Assets,
+} from 'pixi.js';
 import type {
   CanvasRectangle as Rectangle,
   CanvasPolygon as Polygon,
@@ -266,5 +273,63 @@ export const downloadAbsoluteCoordinatesJson = (
   } catch (error) {
     console.error('절대 좌표 JSON 다운로드 중 오류 발생:', error);
     alert('절대 좌표 JSON 다운로드 중 오류가 발생했습니다.');
+  }
+};
+
+// 이미지와 라벨을 합쳐서 고정 해상도(기본 400x400) PNG로 다운로드
+export const downloadImageAndLabelsFixedSize = async (
+  rectangles: Rectangle[],
+  polygons: Polygon[],
+  imageUrl: string,
+  currentImageSize: { width: number; height: number },
+  outputSize: number = 400,
+  filename: string = 'labels_with_image'
+) => {
+  try {
+    if (!currentImageSize.width || !currentImageSize.height) {
+      alert('이미지 크기 정보를 불러오지 못했습니다.');
+      return;
+    }
+    const app = new Application();
+    await app.init({
+      width: outputSize,
+      height: outputSize,
+      backgroundColor: 0x000000,
+      antialias: true,
+    });
+    const texture = await Assets.load(imageUrl);
+    const sprite = new Sprite(texture);
+    sprite.anchor.set(0.5);
+    sprite.x = outputSize / 2;
+    sprite.y = outputSize / 2;
+    const fitScale = Math.min(
+      outputSize / texture.width,
+      outputSize / texture.height
+    );
+    sprite.scale.set(fitScale);
+    app.stage.addChild(sprite);
+    const labelContainer = new Container();
+    labelContainer.x = outputSize / 2;
+    labelContainer.y = outputSize / 2;
+    const renderedImageWidth = texture.width * fitScale;
+    const renderedImageHeight = texture.height * fitScale;
+    const scaleX = renderedImageWidth / currentImageSize.width;
+    const scaleY = renderedImageHeight / currentImageSize.height;
+    labelContainer.scale.set(scaleX, scaleY);
+    const graphics = new Graphics();
+    labelContainer.addChild(graphics);
+    drawRectangles(graphics, rectangles);
+    drawPolygons(graphics, polygons);
+    app.stage.addChild(labelContainer);
+    app.renderer.render(app.stage);
+    const canvas = app.canvas as HTMLCanvasElement;
+    const link = document.createElement('a');
+    link.download = `${filename}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    app.destroy(true);
+  } catch (error) {
+    console.error('이미지+라벨(고정 해상도) 다운로드 중 오류 발생:', error);
+    alert('이미지+라벨 다운로드 중 오류가 발생했습니다.');
   }
 };

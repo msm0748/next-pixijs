@@ -3,6 +3,7 @@ import {
   downloadLabels,
   sendAbsoluteCoordinatesData,
   downloadAbsoluteCoordinatesJson,
+  downloadImageAndLabelsFixedSize,
 } from '@shared/api/labels';
 
 export default function Tools() {
@@ -130,7 +131,15 @@ export default function Tools() {
             .toISOString()
             .replace(/[:.]/g, '-')
             .split('T')[0];
-          downloadLabels(rectangles, polygons, `labels_${timestamp}`);
+          const currentImageSize = canvasStore.imageSize.get();
+          downloadImageAndLabelsFixedSize(
+            rectangles,
+            polygons,
+            '/test.jpg',
+            currentImageSize,
+            400,
+            `labels_${timestamp}`
+          );
         }}
         style={{
           background: '#28a745',
@@ -141,7 +150,7 @@ export default function Tools() {
           cursor: 'pointer',
         }}
       >
-        라벨 다운로드
+        이미지+라벨 다운로드 (400x400)
       </button>
       <button
         onClick={() => {
