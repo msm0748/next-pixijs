@@ -1,6 +1,5 @@
 import { canvasStore, canvasActions } from '@entities/canvas';
 import {
-  downloadLabels,
   sendAbsoluteCoordinatesData,
   downloadAbsoluteCoordinatesJson,
   downloadImageAndLabelsFixedSize,

@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     console.log('세션 ID:', labelData.sessionId);
     console.log('사각형 개수:', labelData.rectangles?.length || 0);
     console.log('폴리곤 개수:', labelData.polygons?.length || 0);
-    console.log('상세 데이터:', JSON.stringify(labelData, null, 2));
+    // console.log('상세 데이터:', JSON.stringify(labelData, null, 2));
     console.log('========================');
 
     // 실제 환경에서는 여기서 데이터베이스에 저장
