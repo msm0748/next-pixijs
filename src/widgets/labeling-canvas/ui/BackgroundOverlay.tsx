@@ -14,6 +14,7 @@ interface BackgroundOverlayProps {
   canvasSize: { width: number; height: number };
   scale: number;
   position: { x: number; y: number };
+  imagePosition: { x: number; y: number };
   enabled: boolean;
 }
 
@@ -23,6 +24,7 @@ export const BackgroundOverlay = ({
   canvasSize,
   scale,
   position,
+  imagePosition,
   enabled,
 }: BackgroundOverlayProps) => {
   const drawOverlay = useCallback(
@@ -67,24 +69,30 @@ export const BackgroundOverlay = ({
         if (area.type === 'rect') {
           const normalized = normalizeRect(area.data);
           graphics.rect(
-            normalized.x,
-            normalized.y,
+            normalized.x + imagePosition.x,
+            normalized.y + imagePosition.y,
             normalized.width,
             normalized.height
           );
           graphics.fill();
         } else if (area.type === 'polygon') {
           const points = area.data.points;
-          graphics.moveTo(points[0].x, points[0].y);
+          graphics.moveTo(
+            points[0].x + imagePosition.x,
+            points[0].y + imagePosition.y
+          );
           for (let i = 1; i < points.length; i++) {
-            graphics.lineTo(points[i].x, points[i].y);
+            graphics.lineTo(
+              points[i].x + imagePosition.x,
+              points[i].y + imagePosition.y
+            );
           }
           graphics.closePath();
           graphics.fill();
         }
       });
     },
-    [rectangles, polygons, canvasSize, scale, position, enabled]
+    [rectangles, polygons, canvasSize, scale, position, imagePosition, enabled]
   );
 
   return <pixiGraphics draw={drawOverlay} />;

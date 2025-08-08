@@ -650,6 +650,7 @@ const App = observer(() => {
               canvasSize={canvasSize}
               scale={scale}
               position={position}
+              imagePosition={imagePosition}
               enabled={showBackgroundOverlay}
             />
             <pixiContainer x={imagePosition.x} y={imagePosition.y}>
