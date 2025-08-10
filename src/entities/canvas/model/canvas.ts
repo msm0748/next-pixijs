@@ -453,18 +453,7 @@ export const canvasActions = {
       canvasStore.selectedPolygonId.set(null);
     }
   },
-  clearRectangles: () => {
-    canvasStore.rectangles.set([]);
-    canvasStore.selectedRectId.set(null);
-  },
-  clearPolygons: () => {
-    canvasStore.polygons.set([]);
-    canvasStore.selectedPolygonId.set(null);
-    canvasStore.isDrawingPolygon.set(false);
-    canvasStore.currentPolygon.set(null);
-    canvasStore.hoveredPointIndex.set(null);
-    canvasStore.currentMousePosition.set(null);
-  },
+
   clearAll: () => {
     canvasStore.rectangles.set([]);
     canvasStore.polygons.set([]);
@@ -519,18 +508,7 @@ export const canvasActions = {
     canvasStore.imageSize.set(imageSize);
     canvasStore.imagePosition.set({ x: centerX, y: centerY });
   },
-  setImageSize: (size: { width: number; height: number }) => {
-    canvasStore.imageSize.set(size);
-  },
-  setImagePosition: (position: { x: number; y: number }) => {
-    canvasStore.imagePosition.set(position);
-  },
-  centerImageInCanvas: () => {
-    const canvasSize = canvasStore.canvasSize.get();
-    const centerX = canvasSize.width / 2;
-    const centerY = canvasSize.height / 2;
-    canvasStore.imagePosition.set({ x: centerX, y: centerY });
-  },
+
   initializeImageLayout: (
     canvasSize: { width: number; height: number },
     originalImageSize?: { width: number; height: number }
@@ -556,11 +534,7 @@ export const canvasActions = {
     const centerY = canvasSize.height / 2;
     canvasStore.imagePosition.set({ x: centerX, y: centerY });
   },
-  getCurrentImageSize: () => {
-    const imageSize = canvasStore.imageSize.get();
-    const scale = canvasStore.scale.get();
-    return { width: imageSize.width * scale, height: imageSize.height * scale };
-  },
+
   setViewportScale: (scale: number) => {
     canvasStore.scale.set(Math.max(0.1, Math.min(5.0, scale)));
   },
@@ -720,92 +694,6 @@ export const canvasActions = {
         scaleY,
       },
     };
-  },
-  convertRectangleToAbsolute: (rect: Rectangle) => {
-    const imageSize = canvasStore.imageSize.get();
-    const originalImageSize = canvasStore.originalImageSize.get();
-    const scaleX = originalImageSize.width / imageSize.width;
-    const scaleY = originalImageSize.height / imageSize.height;
-    const absoluteX = (rect.x + imageSize.width / 2) * scaleX;
-    const absoluteY = (rect.y + imageSize.height / 2) * scaleY;
-    const absoluteWidth = rect.width * scaleX;
-    const absoluteHeight = rect.height * scaleY;
-    return {
-      id: rect.id,
-      x: Math.round(absoluteX),
-      y: Math.round(absoluteY),
-      width: Math.round(absoluteWidth),
-      height: Math.round(absoluteHeight),
-      label: rect.label,
-      color: rect.color,
-    };
-  },
-  convertPolygonToAbsolute: (polygon: Polygon) => {
-    const imageSize = canvasStore.imageSize.get();
-    const originalImageSize = canvasStore.originalImageSize.get();
-    const scaleX = originalImageSize.width / imageSize.width;
-    const scaleY = originalImageSize.height / imageSize.height;
-    return {
-      id: polygon.id,
-      points: polygon.points.map((point) => {
-        const absoluteX = (point.x + imageSize.width / 2) * scaleX;
-        const absoluteY = (point.y + imageSize.height / 2) * scaleY;
-        return { x: Math.round(absoluteX), y: Math.round(absoluteY) };
-      }),
-      isComplete: polygon.isComplete,
-      label: polygon.label,
-      color: polygon.color,
-    };
-  },
-  convertFromAbsoluteCoordinates: (
-    absoluteRectangles: Array<{
-      id: string;
-      x: number;
-      y: number;
-      width: number;
-      height: number;
-      label?: string;
-      color?: string;
-    }>,
-    absolutePolygons: Array<{
-      id: string;
-      points: Array<{ x: number; y: number }>;
-      isComplete?: boolean;
-      label?: string;
-      color?: string;
-    }>,
-    serverOriginalImageSize: { width: number; height: number }
-  ) => {
-    const imageSize = canvasStore.imageSize.get();
-    const scaleX = imageSize.width / serverOriginalImageSize.width;
-    const scaleY = imageSize.height / serverOriginalImageSize.height;
-    const rectangles = absoluteRectangles.map((rect) => {
-      const relativeX = rect.x * scaleX - imageSize.width / 2;
-      const relativeY = rect.y * scaleY - imageSize.height / 2;
-      const relativeWidth = rect.width * scaleX;
-      const relativeHeight = rect.height * scaleY;
-      return {
-        id: rect.id,
-        x: relativeX,
-        y: relativeY,
-        width: relativeWidth,
-        height: relativeHeight,
-        label: rect.label,
-        color: rect.color,
-      };
-    });
-    const polygons = absolutePolygons.map((polygon) => ({
-      id: polygon.id,
-      points: polygon.points.map((point) => {
-        const relativeX = point.x * scaleX - imageSize.width / 2;
-        const relativeY = point.y * scaleY - imageSize.height / 2;
-        return { x: relativeX, y: relativeY };
-      }),
-      isComplete: polygon.isComplete ?? true,
-      label: polygon.label,
-      color: polygon.color,
-    }));
-    return { rectangles, polygons };
   },
 };
 
