@@ -185,6 +185,29 @@ const pushHistorySnapshot = () => {
   canvasStore.historyFuture.set([]);
 };
 
+// Common image layout calculation used by setCanvasSize and initializeImageLayout
+const calculateImageLayout = (
+  canvasSize: { width: number; height: number },
+  originalImageSize: { width: number; height: number }
+) => {
+  const targetCanvasSize = {
+    width: canvasSize.width * 0.75,
+    height: canvasSize.height * 0.75,
+  };
+  const scaleX = targetCanvasSize.width / originalImageSize.width;
+  const scaleY = targetCanvasSize.height / originalImageSize.height;
+  const scale = Math.min(scaleX, scaleY);
+  const imageSize = {
+    width: originalImageSize.width * scale,
+    height: originalImageSize.height * scale,
+  };
+  const imagePosition = {
+    x: canvasSize.width / 2,
+    y: canvasSize.height / 2,
+  };
+  return { imageSize, imagePosition };
+};
+
 export const canvasActions = {
   setPosition: (position: { x: number; y: number }) => {
     canvasStore.position.set(position);
@@ -627,21 +650,34 @@ export const canvasActions = {
   setCanvasSize: (size: { width: number; height: number }) => {
     canvasStore.canvasSize.set(size);
     const originalImageSize = canvasStore.originalImageSize.get();
-    const targetCanvasSize = {
-      width: size.width * 0.75,
-      height: size.height * 0.75,
-    };
-    const scaleX = targetCanvasSize.width / originalImageSize.width;
-    const scaleY = targetCanvasSize.height / originalImageSize.height;
-    const scale = Math.min(scaleX, scaleY);
-    const imageSize = {
-      width: originalImageSize.width * scale,
-      height: originalImageSize.height * scale,
-    };
-    const centerX = size.width / 2;
-    const centerY = size.height / 2;
+    const previousImageSize = canvasStore.imageSize.get();
+    const { imageSize, imagePosition } = calculateImageLayout(
+      size,
+      originalImageSize
+    );
     canvasStore.imageSize.set(imageSize);
-    canvasStore.imagePosition.set({ x: centerX, y: centerY });
+    canvasStore.imagePosition.set(imagePosition);
+    // Rescale existing shapes to keep visual positions consistent on resize
+    const scaleX = imageSize.width / previousImageSize.width;
+    const scaleY = imageSize.height / previousImageSize.height;
+    const currentRectangles = canvasStore.rectangles.get();
+    const currentPolygons = canvasStore.polygons.get();
+    const updatedRectangles = currentRectangles.map((rect) => ({
+      ...rect,
+      x: rect.x * scaleX,
+      y: rect.y * scaleY,
+      width: rect.width * scaleX,
+      height: rect.height * scaleY,
+    }));
+    const updatedPolygons = currentPolygons.map((polygon) => ({
+      ...polygon,
+      points: polygon.points.map((point) => ({
+        x: point.x * scaleX,
+        y: point.y * scaleY,
+      })),
+    }));
+    canvasStore.rectangles.set(updatedRectangles);
+    canvasStore.polygons.set(updatedPolygons);
   },
 
   initializeImageLayout: (
@@ -653,21 +689,12 @@ export const canvasActions = {
       canvasStore.originalImageSize.set(originalImageSize);
     }
     const currentOriginalImageSize = canvasStore.originalImageSize.get();
-    const targetCanvasSize = {
-      width: canvasSize.width * 0.75,
-      height: canvasSize.height * 0.75,
-    };
-    const scaleX = targetCanvasSize.width / currentOriginalImageSize.width;
-    const scaleY = targetCanvasSize.height / currentOriginalImageSize.height;
-    const scale = Math.min(scaleX, scaleY);
-    const imageSize = {
-      width: currentOriginalImageSize.width * scale,
-      height: currentOriginalImageSize.height * scale,
-    };
+    const { imageSize, imagePosition } = calculateImageLayout(
+      canvasSize,
+      currentOriginalImageSize
+    );
     canvasStore.imageSize.set(imageSize);
-    const centerX = canvasSize.width / 2;
-    const centerY = canvasSize.height / 2;
-    canvasStore.imagePosition.set({ x: centerX, y: centerY });
+    canvasStore.imagePosition.set(imagePosition);
   },
 
   setViewportScale: (scale: number) => {

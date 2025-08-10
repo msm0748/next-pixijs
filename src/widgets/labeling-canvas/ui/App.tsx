@@ -70,29 +70,7 @@ const App = observer(() => {
           height: window.innerHeight,
         };
         setCanvasSize(newCanvasSize);
-        const oldImageSize = canvasStore.imageSize.get();
         canvasActions.setCanvasSize(newCanvasSize);
-        const newImageSize = canvasStore.imageSize.get();
-        const scaleX = newImageSize.width / oldImageSize.width;
-        const scaleY = newImageSize.height / oldImageSize.height;
-        const currentRectangles = canvasStore.rectangles.get();
-        const currentPolygons = canvasStore.polygons.get();
-        const updatedRectangles = currentRectangles.map((rect) => ({
-          ...rect,
-          x: rect.x * scaleX,
-          y: rect.y * scaleY,
-          width: rect.width * scaleX,
-          height: rect.height * scaleY,
-        }));
-        const updatedPolygons = currentPolygons.map((polygon) => ({
-          ...polygon,
-          points: polygon.points.map((point) => ({
-            x: point.x * scaleX,
-            y: point.y * scaleY,
-          })),
-        }));
-        canvasStore.rectangles.set(updatedRectangles);
-        canvasStore.polygons.set(updatedPolygons);
         canvasActions.setViewportScale(1.0);
         canvasActions.setPosition({ x: 0, y: 0 });
       }
