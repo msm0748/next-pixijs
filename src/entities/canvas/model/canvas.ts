@@ -61,15 +61,15 @@ export interface CanvasState {
   historyFuture: HistorySnapshot[];
 }
 
-const dummyPolygons = Array.from({ length: 2000 }, (_, i) => ({
-  id: `${i + 1}`,
-  points: [
-    { x: 100 + (i % 100) * 10, y: 100 + Math.floor(i / 100) * 10 },
-    { x: 200 + (i % 100) * 10, y: 100 + Math.floor(i / 100) * 10 },
-    { x: 200 + (i % 100) * 10, y: 200 + Math.floor(i / 100) * 10 },
-  ],
-  isComplete: true,
-}));
+// const dummyPolygons = Array.from({ length: 2000 }, (_, i) => ({
+//   id: `${i + 1}`,
+//   points: [
+//     { x: 100 + (i % 100) * 10, y: 100 + Math.floor(i / 100) * 10 },
+//     { x: 200 + (i % 100) * 10, y: 100 + Math.floor(i / 100) * 10 },
+//     { x: 200 + (i % 100) * 10, y: 200 + Math.floor(i / 100) * 10 },
+//   ],
+//   isComplete: true,
+// }));
 
 export const canvasStore = observable<CanvasState>({
   position: { x: 0, y: 0 },
@@ -81,7 +81,7 @@ export const canvasStore = observable<CanvasState>({
   rectangles: [],
   isDrawingPolygon: false,
   currentPolygon: null,
-  polygons: dummyPolygons,
+  polygons: [],
   hoveredPointIndex: null,
   currentMousePosition: null,
   selectedRectId: null,
@@ -115,6 +115,8 @@ export const canvasStore = observable<CanvasState>({
 interface HistorySnapshot {
   rectangles: Rectangle[];
   polygons: Polygon[];
+  isDrawingPolygon: boolean;
+  currentPolygon: Polygon | null;
 }
 
 const cloneRectangles = (rects: Rectangle[]): Rectangle[] =>
@@ -126,18 +128,32 @@ const clonePolygons = (polys: Polygon[]): Polygon[] =>
     points: p.points.map((pt) => ({ ...pt })),
   }));
 
+const clonePolygon = (poly: Polygon | null): Polygon | null =>
+  poly
+    ? {
+        ...poly,
+        points: poly.points.map((pt) => ({ ...pt })),
+      }
+    : null;
+
 const takeSnapshot = (): HistorySnapshot => {
   const rectangles = canvasStore.rectangles.get();
   const polygons = canvasStore.polygons.get();
+  const isDrawingPolygon = canvasStore.isDrawingPolygon.get();
+  const currentPolygon = canvasStore.currentPolygon.get();
   return {
     rectangles: cloneRectangles(rectangles),
     polygons: clonePolygons(polygons),
+    isDrawingPolygon,
+    currentPolygon: clonePolygon(currentPolygon),
   };
 };
 
 const restoreSnapshot = (snapshot: HistorySnapshot) => {
   canvasStore.rectangles.set(cloneRectangles(snapshot.rectangles));
   canvasStore.polygons.set(clonePolygons(snapshot.polygons));
+  canvasStore.isDrawingPolygon.set(snapshot.isDrawingPolygon);
+  canvasStore.currentPolygon.set(clonePolygon(snapshot.currentPolygon));
   // Validate selection after restore
   const currentRectId = canvasStore.selectedRectId.get();
   const currentPolyId = canvasStore.selectedPolygonId.get();
@@ -219,6 +235,8 @@ export const canvasActions = {
     canvasStore.drawingRect.set(null);
   },
   startPolygon: (point: { x: number; y: number }) => {
+    // Record history before starting a new polygon
+    pushHistorySnapshot();
     const newPolygon: Polygon = {
       id: Date.now().toString(),
       points: [point],
@@ -246,6 +264,8 @@ export const canvasActions = {
       canvasStore.hoveredPointIndex.set(null);
       canvasStore.currentMousePosition.set(null);
     } else {
+      // Record history before adding each point to the in-progress polygon
+      pushHistorySnapshot();
       const updatedPolygon = {
         ...currentPolygon,
         points: [...currentPolygon.points, point],
