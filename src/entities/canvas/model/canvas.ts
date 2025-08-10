@@ -59,6 +59,8 @@ export interface CanvasState {
   // History stacks for undo/redo
   historyPast: HistorySnapshot[];
   historyFuture: HistorySnapshot[];
+  // Skip the very next history push (used to coalesce chained actions)
+  historySkipNext: boolean;
 }
 
 // const dummyPolygons = Array.from({ length: 2000 }, (_, i) => ({
@@ -110,6 +112,7 @@ export const canvasStore = observable<CanvasState>({
   mode: 'pan',
   historyPast: [],
   historyFuture: [],
+  historySkipNext: false,
 });
 
 interface HistorySnapshot {
@@ -168,6 +171,11 @@ const restoreSnapshot = (snapshot: HistorySnapshot) => {
 };
 
 const pushHistorySnapshot = () => {
+  // If flagged, consume the flag and skip this push to avoid double history
+  if (canvasStore.historySkipNext.get()) {
+    canvasStore.historySkipNext.set(false);
+    return;
+  }
   const past = canvasStore.historyPast.get();
   const snapshot = takeSnapshot();
   const newPast = [...past, snapshot];
@@ -495,6 +503,8 @@ export const canvasActions = {
     if (!selectedPolygonId) return;
     // Record history before inserting a point
     pushHistorySnapshot();
+    // Avoid immediate double history when we also start editing this new point
+    canvasStore.historySkipNext.set(true);
     const polygons = canvasStore.polygons.get();
     const polygonIndex = polygons.findIndex((p) => p.id === selectedPolygonId);
     if (polygonIndex === -1) return;
