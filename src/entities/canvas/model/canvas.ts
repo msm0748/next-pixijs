@@ -56,6 +56,9 @@ export interface CanvasState {
   originalImageSize: { width: number; height: number };
   scale: number;
   mode: 'pan' | 'draw' | 'polygon' | 'select';
+  // History stacks for undo/redo
+  historyPast: HistorySnapshot[];
+  historyFuture: HistorySnapshot[];
 }
 
 const dummyPolygons = Array.from({ length: 2000 }, (_, i) => ({
@@ -105,7 +108,58 @@ export const canvasStore = observable<CanvasState>({
   originalImageSize: { width: 1920, height: 1080 },
   scale: 1.0,
   mode: 'pan',
+  historyPast: [],
+  historyFuture: [],
 });
+
+interface HistorySnapshot {
+  rectangles: Rectangle[];
+  polygons: Polygon[];
+}
+
+const cloneRectangles = (rects: Rectangle[]): Rectangle[] =>
+  rects.map((r) => ({ ...r }));
+
+const clonePolygons = (polys: Polygon[]): Polygon[] =>
+  polys.map((p) => ({
+    ...p,
+    points: p.points.map((pt) => ({ ...pt })),
+  }));
+
+const takeSnapshot = (): HistorySnapshot => {
+  const rectangles = canvasStore.rectangles.get();
+  const polygons = canvasStore.polygons.get();
+  return {
+    rectangles: cloneRectangles(rectangles),
+    polygons: clonePolygons(polygons),
+  };
+};
+
+const restoreSnapshot = (snapshot: HistorySnapshot) => {
+  canvasStore.rectangles.set(cloneRectangles(snapshot.rectangles));
+  canvasStore.polygons.set(clonePolygons(snapshot.polygons));
+  // Validate selection after restore
+  const currentRectId = canvasStore.selectedRectId.get();
+  const currentPolyId = canvasStore.selectedPolygonId.get();
+  if (currentRectId) {
+    const exists = snapshot.rectangles.some((r) => r.id === currentRectId);
+    if (!exists) canvasStore.selectedRectId.set(null);
+  }
+  if (currentPolyId) {
+    const exists = snapshot.polygons.some((p) => p.id === currentPolyId);
+    if (!exists) canvasStore.selectedPolygonId.set(null);
+  }
+};
+
+const pushHistorySnapshot = () => {
+  const past = canvasStore.historyPast.get();
+  const snapshot = takeSnapshot();
+  const newPast = [...past, snapshot];
+  if (newPast.length > 15) newPast.shift();
+  canvasStore.historyPast.set(newPast);
+  // New action invalidates redo stack
+  canvasStore.historyFuture.set([]);
+};
 
 export const canvasActions = {
   setPosition: (position: { x: number; y: number }) => {
@@ -155,6 +209,8 @@ export const canvasActions = {
       Math.abs(drawingRect.width) > 5 &&
       Math.abs(drawingRect.height) > 5
     ) {
+      // Record history before committing rectangle
+      pushHistorySnapshot();
       const clampedRect =
         canvasActions.clampRectangleToImageBounds(drawingRect);
       canvasStore.rectangles.push(clampedRect);
@@ -180,6 +236,8 @@ export const canvasActions = {
     const distance = Math.hypot(point.x - firstPoint.x, point.y - firstPoint.y);
     if (distance <= 10 && currentPolygon.points.length >= 3) {
       const completedPolygon = { ...currentPolygon, isComplete: true };
+      // Record history before committing polygon
+      pushHistorySnapshot();
       const clampedPolygon =
         canvasActions.clampPolygonToImageBounds(completedPolygon);
       canvasStore.polygons.push(clampedPolygon);
@@ -233,6 +291,8 @@ export const canvasActions = {
     handle: 'nw' | 'ne' | 'sw' | 'se' | 'n' | 'e' | 's' | 'w',
     rect: Rectangle
   ) => {
+    // Record history at the start of a resize interaction
+    pushHistorySnapshot();
     canvasStore.isResizing.set(true);
     canvasStore.resizeHandle.set(handle);
     const normalized = normalizeRect(rect);
@@ -308,6 +368,10 @@ export const canvasActions = {
     rect?: Rectangle,
     polygon?: Polygon
   ) => {
+    // Record history at the start of a move interaction
+    if (rect || polygon) {
+      pushHistorySnapshot();
+    }
     canvasStore.isMoving.set(true);
     canvasStore.moveStartPos.set(worldPos);
     if (rect) {
@@ -373,6 +437,8 @@ export const canvasActions = {
     pointIndex: number,
     point: { x: number; y: number }
   ) => {
+    // Record history at the start of a point edit interaction
+    pushHistorySnapshot();
     canvasStore.isEditingPolygon.set(true);
     canvasStore.editingPointIndex.set(pointIndex);
     canvasStore.editStartPoint.set(point);
@@ -407,6 +473,8 @@ export const canvasActions = {
   ) => {
     const selectedPolygonId = canvasStore.selectedPolygonId.get();
     if (!selectedPolygonId) return;
+    // Record history before inserting a point
+    pushHistorySnapshot();
     const polygons = canvasStore.polygons.get();
     const polygonIndex = polygons.findIndex((p) => p.id === selectedPolygonId);
     if (polygonIndex === -1) return;
@@ -425,6 +493,8 @@ export const canvasActions = {
   removePolygonPoint: (pointIndex: number) => {
     const selectedPolygonId = canvasStore.selectedPolygonId.get();
     if (!selectedPolygonId) return;
+    // Record history before removing a point
+    pushHistorySnapshot();
     const polygons = canvasStore.polygons.get();
     const polygonIndex = polygons.findIndex((p) => p.id === selectedPolygonId);
     if (polygonIndex === -1) return;
@@ -440,6 +510,8 @@ export const canvasActions = {
     canvasStore.polygons.set(updatedPolygons);
   },
   removeRectangle: (id: string) => {
+    // Record history before removing a rectangle
+    pushHistorySnapshot();
     const rectangles = canvasStore.rectangles.get();
     canvasStore.rectangles.set(rectangles.filter((rect) => rect.id !== id));
     if (canvasStore.selectedRectId.get() === id) {
@@ -447,6 +519,8 @@ export const canvasActions = {
     }
   },
   removePolygon: (id: string) => {
+    // Record history before removing a polygon
+    pushHistorySnapshot();
     const polygons = canvasStore.polygons.get();
     canvasStore.polygons.set(polygons.filter((polygon) => polygon.id !== id));
     if (canvasStore.selectedPolygonId.get() === id) {
@@ -455,6 +529,13 @@ export const canvasActions = {
   },
 
   clearAll: () => {
+    // Record history before clearing all shapes
+    if (
+      canvasStore.rectangles.get().length > 0 ||
+      canvasStore.polygons.get().length > 0
+    ) {
+      pushHistorySnapshot();
+    }
     canvasStore.rectangles.set([]);
     canvasStore.polygons.set([]);
     canvasStore.selectedRectId.set(null);
@@ -463,6 +544,30 @@ export const canvasActions = {
     canvasStore.currentPolygon.set(null);
     canvasStore.hoveredPointIndex.set(null);
     canvasStore.currentMousePosition.set(null);
+  },
+  undo: () => {
+    const past = canvasStore.historyPast.get();
+    if (past.length === 0) return;
+    const currentSnapshot = takeSnapshot();
+    const previous = past[past.length - 1];
+    canvasStore.historyPast.set(past.slice(0, past.length - 1));
+    const future = canvasStore.historyFuture.get();
+    const newFuture = [...future, currentSnapshot];
+    if (newFuture.length > 15) newFuture.shift();
+    canvasStore.historyFuture.set(newFuture);
+    restoreSnapshot(previous);
+  },
+  redo: () => {
+    const future = canvasStore.historyFuture.get();
+    if (future.length === 0) return;
+    const currentSnapshot = takeSnapshot();
+    const next = future[future.length - 1];
+    canvasStore.historyFuture.set(future.slice(0, future.length - 1));
+    const past = canvasStore.historyPast.get();
+    const newPast = [...past, currentSnapshot];
+    if (newPast.length > 15) newPast.shift();
+    canvasStore.historyPast.set(newPast);
+    restoreSnapshot(next);
   },
   updateGlobalMousePosition: (
     worldPos: { x: number; y: number } | null,

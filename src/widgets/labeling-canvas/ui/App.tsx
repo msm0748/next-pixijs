@@ -481,6 +481,14 @@ const App = observer(() => {
       } else if (e.key === 's' || e.key === 'S') {
         canvasActions.setMode('select');
         canvasActions.setCrosshairVisible(false);
+      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+        if (e.shiftKey) {
+          canvasActions.redo();
+        } else {
+          canvasActions.undo();
+        }
+      } else if (e.ctrlKey && e.key.toLowerCase() === 'y') {
+        canvasActions.redo();
       } else if (e.key === 'Escape') {
         const currentIsDrawing = canvasStore.isDrawing.get();
         const currentIsDrawingPolygon = canvasStore.isDrawingPolygon.get();

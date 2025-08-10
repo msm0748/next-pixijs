@@ -46,6 +46,36 @@ export default function Tools() {
       </button>
       <button
         onClick={() => {
+          canvasActions.undo();
+        }}
+        style={{
+          background: '#495057',
+          color: 'white',
+          border: 'none',
+          padding: '8px 16px',
+          borderRadius: '3px',
+          cursor: 'pointer',
+        }}
+      >
+        되돌리기 (Ctrl/Cmd+Z)
+      </button>
+      <button
+        onClick={() => {
+          canvasActions.redo();
+        }}
+        style={{
+          background: '#495057',
+          color: 'white',
+          border: 'none',
+          padding: '8px 16px',
+          borderRadius: '3px',
+          cursor: 'pointer',
+        }}
+      >
+        되돌리기 취소 (Shift+Ctrl/Cmd+Z or Ctrl+Y)
+      </button>
+      <button
+        onClick={() => {
           canvasActions.setMode('draw');
           canvasActions.setCrosshairVisible(true);
         }}
