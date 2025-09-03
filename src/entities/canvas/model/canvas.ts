@@ -273,6 +273,7 @@ export const canvasActions = {
       points: [point],
       isComplete: false,
       color: '#ff0000',
+      label: '곰',
     };
     canvasStore.isDrawingPolygon.set(true);
     canvasStore.currentPolygon.set(newPolygon);
@@ -409,11 +410,7 @@ export const canvasActions = {
     updatedRectangles[rectIndex] = clampedRect;
     canvasStore.rectangles.set(updatedRectangles);
   },
-  endResize: () => {
-    canvasStore.isResizing.set(false);
-    canvasStore.resizeHandle.set(null);
-    canvasStore.resizeStartRect.set(null);
-  },
+
   startMove: (
     worldPos: { x: number; y: number },
     rect?: Rectangle,
@@ -513,6 +510,13 @@ export const canvasActions = {
     updatedPolygons[polygonIndex] = clampedPolygon;
     canvasStore.polygons.set(updatedPolygons);
   },
+
+  endResize: () => {
+    canvasStore.isResizing.set(false);
+    canvasStore.resizeHandle.set(null);
+    canvasStore.resizeStartRect.set(null);
+  },
+
   endEditPolygonPoint: () => {
     canvasStore.isEditingPolygon.set(false);
     canvasStore.editingPointIndex.set(null);

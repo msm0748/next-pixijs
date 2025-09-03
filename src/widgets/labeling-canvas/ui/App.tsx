@@ -1,7 +1,7 @@
 'use client';
 
 import { Application, extend } from '@pixi/react';
-import { Container, Sprite, Graphics, Assets, Texture } from 'pixi.js';
+import { Container, Sprite, Graphics, Assets, Texture, Text } from 'pixi.js';
 import { useState, useRef, PointerEvent, useEffect } from 'react';
 import { observer } from '@legendapp/state/react';
 import { usePathname } from 'next/navigation';
@@ -13,6 +13,7 @@ import {
 } from '@entities/canvas';
 import { RectangleRenderer } from './RectangleRenderer';
 import { PolygonRenderer } from './PolygonRenderer';
+import { LabelRenderer } from './LabelRenderer';
 import { SelectionHandles } from './SelectionHandles';
 import { PolygonSelectionHandles } from './PolygonSelectionHandles';
 import { Crosshair } from './Crosshair';
@@ -30,7 +31,7 @@ import { sendApiData } from '@shared/api/labels';
 import { debounce } from 'lodash';
 import Tools from '@features/tools';
 
-extend({ Container, Sprite, Graphics });
+extend({ Container, Sprite, Graphics, Text });
 
 const App = observer(() => {
   const [texture, setTexture] = useState<Texture | null>(null);
@@ -173,6 +174,7 @@ const App = observer(() => {
         width: 0,
         height: 0,
         color: '#ff0000',
+        label: '곰',
       };
       canvasActions.startDrawing(newRect);
     } else if (currentMode === 'polygon') {
@@ -617,6 +619,9 @@ const App = observer(() => {
           width={typeof window !== 'undefined' ? window.innerWidth : 800}
           height={typeof window !== 'undefined' ? window.innerHeight : 600}
           backgroundAlpha={0}
+          antialias={true}
+          resolution={window.devicePixelRatio || 1}
+          autoDensity={true}
           resizeTo={containerRef}
         >
           <pixiContainer x={position.x} y={position.y} scale={scale}>
@@ -653,6 +658,11 @@ const App = observer(() => {
               <SelectionHandles selectedRect={selectedRect} scale={scale} />
               <PolygonSelectionHandles
                 selectedPolygon={selectedPolygon}
+                scale={scale}
+              />
+              <LabelRenderer
+                rectangles={rectangles}
+                polygons={polygons}
                 scale={scale}
               />
             </pixiContainer>
