@@ -14,7 +14,7 @@ import {
 import { RectangleRenderer } from './RectangleRenderer';
 import { PolygonRenderer } from './PolygonRenderer';
 import { LabelRenderer } from './LabelRenderer';
-import { SelectionHandles } from './SelectionHandles';
+import { RectangleSelectionHandles } from './RectangleSelectionHandles';
 import { PolygonSelectionHandles } from './PolygonSelectionHandles';
 import { Crosshair } from './Crosshair';
 import { BackgroundOverlay } from './BackgroundOverlay';
@@ -655,7 +655,10 @@ const App = observer(() => {
                 hoveredPointIndex={hoveredPointIndex}
                 currentMousePosition={currentMousePosition}
               />
-              <SelectionHandles selectedRect={selectedRect} scale={scale} />
+              <RectangleSelectionHandles
+                selectedRect={selectedRect}
+                scale={scale}
+              />
               <PolygonSelectionHandles
                 selectedPolygon={selectedPolygon}
                 scale={scale}

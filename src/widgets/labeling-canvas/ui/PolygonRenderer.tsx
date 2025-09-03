@@ -2,7 +2,10 @@
 
 import { Graphics } from 'pixi.js';
 import { useCallback } from 'react';
-import type { CanvasPolygon as Polygon } from '@entities/canvas';
+import {
+  LIGHT_BG_ALPHA,
+  type CanvasPolygon as Polygon,
+} from '@entities/canvas';
 import { colorToHex } from '@shared/lib/color';
 
 interface PolygonRendererProps {
@@ -25,7 +28,7 @@ export const PolygonRenderer = ({
         if (polygon.points.length < 2) return;
         const hexColor = colorToHex(polygon.color);
         if (polygon.isComplete && polygon.points.length >= 3) {
-          graphics.setFillStyle({ color: hexColor, alpha: 0.1 });
+          graphics.setFillStyle({ color: hexColor, alpha: LIGHT_BG_ALPHA });
           graphics.moveTo(polygon.points[0].x, polygon.points[0].y);
           for (let i = 1; i < polygon.points.length; i++) {
             graphics.lineTo(polygon.points[i].x, polygon.points[i].y);
@@ -35,7 +38,8 @@ export const PolygonRenderer = ({
         }
         graphics.setStrokeStyle({
           color: hexColor,
-          width: 2 / window.devicePixelRatio,
+          width: 1 / window.devicePixelRatio,
+          alpha: 0.5,
         });
         graphics.moveTo(polygon.points[0].x, polygon.points[0].y);
         for (let i = 1; i < polygon.points.length; i++) {
@@ -45,24 +49,13 @@ export const PolygonRenderer = ({
           graphics.closePath();
         }
         graphics.stroke();
-        polygon.points.forEach((point) => {
-          graphics.setFillStyle({ color: 0xffffff, alpha: 1 });
-          graphics.circle(point.x, point.y, 4 / window.devicePixelRatio);
-          graphics.fill();
-          graphics.setStrokeStyle({
-            color: hexColor,
-            width: 2 / window.devicePixelRatio,
-          });
-          graphics.circle(point.x, point.y, 4 / window.devicePixelRatio);
-          graphics.stroke();
-        });
       });
       if (currentPolygon && currentPolygon.points.length > 0) {
-        const hexColor = 0x00ff00;
+        const hexColor = colorToHex(currentPolygon.color);
         if (currentPolygon.points.length > 1) {
           graphics.setStrokeStyle({
             color: hexColor,
-            width: 2 / window.devicePixelRatio,
+            width: 1 / window.devicePixelRatio,
           });
           graphics.moveTo(
             currentPolygon.points[0].x,
@@ -80,6 +73,20 @@ export const PolygonRenderer = ({
           const isFirstPoint = index === 0;
           const isHovered = isFirstPoint && hoveredPointIndex === 0;
           const pointRadius = isHovered ? 6 : 4;
+
+          // 현재 마우스 선 위치 표시
+          if (currentMousePosition && currentPolygon.points.length > 0) {
+            const lastPoint =
+              currentPolygon.points[currentPolygon.points.length - 1];
+            graphics.setStrokeStyle({
+              color: hexColor,
+              width: 1 / window.devicePixelRatio,
+            });
+            graphics.moveTo(lastPoint.x, lastPoint.y);
+            graphics.lineTo(currentMousePosition.x, currentMousePosition.y);
+            graphics.stroke();
+          }
+
           graphics.setFillStyle({
             color: isFirstPoint ? 0xffff00 : 0xffffff,
             alpha: 1,
@@ -101,18 +108,7 @@ export const PolygonRenderer = ({
           );
           graphics.stroke();
         });
-        if (currentMousePosition && currentPolygon.points.length > 0) {
-          const lastPoint =
-            currentPolygon.points[currentPolygon.points.length - 1];
-          graphics.setStrokeStyle({
-            color: 0x00ff00,
-            width: 1 / window.devicePixelRatio,
-            alpha: 0.5,
-          });
-          graphics.moveTo(lastPoint.x, lastPoint.y);
-          graphics.lineTo(currentMousePosition.x, currentMousePosition.y);
-          graphics.stroke();
-        }
+
         if (currentPolygon.points.length >= 3) {
           const firstPoint = currentPolygon.points[0];
           graphics.setStrokeStyle({

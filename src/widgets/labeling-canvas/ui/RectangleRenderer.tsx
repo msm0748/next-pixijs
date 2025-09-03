@@ -2,7 +2,11 @@
 
 import { Graphics } from 'pixi.js';
 import { useCallback } from 'react';
-import type { CanvasRectangle as Rectangle } from '@entities/canvas';
+import {
+  LIGHT_BG_ALPHA,
+  SOLID_BG_ALPHA,
+  type CanvasRectangle as Rectangle,
+} from '@entities/canvas';
 import { colorToHex } from '@shared/lib/color';
 import { normalizeRect } from '@shared/lib/rect';
 
@@ -32,7 +36,9 @@ export const RectangleRenderer = ({
           normalized.height
         );
         graphics.stroke();
-        graphics.setFillStyle({ color: hexColor, alpha: 0.1 });
+
+        // 사각형 배경색상 채우기
+        graphics.setFillStyle({ color: hexColor, alpha: LIGHT_BG_ALPHA });
         graphics.rect(
           normalized.x,
           normalized.y,
@@ -43,9 +49,10 @@ export const RectangleRenderer = ({
       });
       if (drawingRect) {
         const normalized = normalizeRect(drawingRect);
+        const hexColor = colorToHex(drawingRect.color);
         if (normalized.width > 2 && normalized.height > 2) {
           graphics.setStrokeStyle({
-            color: 0x00ff00,
+            color: hexColor,
             width: 2 / window.devicePixelRatio,
           });
           graphics.rect(
@@ -55,7 +62,7 @@ export const RectangleRenderer = ({
             normalized.height
           );
           graphics.stroke();
-          graphics.setFillStyle({ color: 0x00ff00, alpha: 0.1 });
+          graphics.setFillStyle({ color: hexColor, alpha: SOLID_BG_ALPHA });
           graphics.rect(
             normalized.x,
             normalized.y,
